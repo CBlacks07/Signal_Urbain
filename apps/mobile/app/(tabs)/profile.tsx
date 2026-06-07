@@ -53,7 +53,7 @@ export default function ProfileScreen() {
   const handleLogout = () => {
     Alert.alert(
       'Deconnexion',
-      'Voulez-vous vraiment vous deconnecter de SignalTogo ?',
+      'Voulez-vous vraiment vous deconnecter de Signal Urbain Togo ?',
       [
         { text: 'Annuler', style: 'cancel' },
         {
@@ -165,7 +165,7 @@ export default function ProfileScreen() {
         </View>
 
         {/* Version */}
-        <Text style={styles.version}>SignalTogo v1.0.0</Text>
+        <Text style={styles.version}>Signal Urbain Togo v1.0.0</Text>
       </ScrollView>
     </View>
   );

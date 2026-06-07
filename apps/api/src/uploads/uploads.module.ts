@@ -3,7 +3,7 @@ import { MulterModule } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { UploadsController } from './uploads.controller';
 import { UploadsService } from './uploads.service';
-import { MinioService } from './minio.service';
+import { CloudinaryService } from './cloudinary.service';
 
 @Module({
   imports: [
@@ -20,7 +20,7 @@ import { MinioService } from './minio.service';
     }),
   ],
   controllers: [UploadsController],
-  providers: [UploadsService, MinioService],
-  exports: [MinioService],
+  providers: [UploadsService, CloudinaryService],
+  exports: [CloudinaryService],
 })
 export class UploadsModule {}

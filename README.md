@@ -1,9 +1,13 @@
-# Signal Urbain
+<p align="center">
+  <img src="public/signal_urbain.png" alt="Signal Urbain" width="160" />
+</p>
+
+<h1 align="center">Signal Urbain</h1>
 
 Plateforme civic-tech de signalement d'incidents urbains au Togo.
 
 Deux interfaces :
-- **SignalTogo** : application mobile (Expo / React Native) pour les citoyens
+- **Signal Urbain Togo** : application mobile (Expo / React Native) pour les citoyens
 - **Signal Urbain** : tableau de bord web (React / Vite) pour les mairies et administrateurs
 
 ---
@@ -17,7 +21,7 @@ signal-urbain/
     dashboard/     # Dashboard mairie — React + Vite + Tailwind
     mobile/        # App citoyenne — Expo SDK 55 + expo-router
   packages/        # (futur) libs partagees
-  docker-compose.dev.yml   # PostgreSQL, Redis, MinIO
+  docker-compose.dev.yml   # PostgreSQL, Redis
 ```
 
 **Monorepo pnpm workspaces** — toutes les commandes se lancent depuis la racine.
@@ -30,7 +34,7 @@ signal-urbain/
 |--------------|----------------------------------------------|
 | API          | NestJS 10, Prisma ORM, PostgreSQL 16 (PostGIS) |
 | Auth         | JWT + OTP par SMS (Twilio / console en dev)  |
-| Stockage     | MinIO (S3-compatible) pour les photos        |
+| Stockage     | Cloudinary pour les photos                   |
 | Cache        | Redis 7                                      |
 | Dashboard    | React 18, Vite 5, Tailwind CSS, Leaflet     |
 | Mobile       | Expo SDK 55, React Native 0.83, expo-router  |
@@ -42,7 +46,7 @@ signal-urbain/
 
 - **Node.js** >= 18 (recommande : 22 LTS)
 - **pnpm** >= 9 (`npm install -g pnpm`)
-- **Docker** + Docker Compose (pour PostgreSQL, Redis, MinIO)
+- **Docker** + Docker Compose (pour PostgreSQL, Redis)
 - **Expo Go** sur votre telephone (Android/iOS) pour tester l'app mobile
 - **Git**
 
@@ -60,7 +64,7 @@ pnpm install
 
 ### 2. Lancer les services Docker
 
-PostgreSQL, Redis et MinIO :
+PostgreSQL et Redis :
 
 ```bash
 pnpm docker:up
@@ -71,8 +75,6 @@ Verifier que tout tourne :
 ```bash
 pnpm docker:logs
 ```
-
-> MinIO Console : http://localhost:9001 (user: `signal_minio` / pass: `signal_minio_secret`)
 
 ### 3. Configurer les variables d'environnement
 
@@ -96,6 +98,11 @@ JWT_SECRET=votre_cle_secrete_ici
 
 # SMS en dev — les OTP s'affichent dans le terminal
 SMS_PROVIDER=console
+
+# Cloudinary (stockage des photos — cloudinary.com)
+CLOUDINARY_CLOUD_NAME=votre_cloud_name
+CLOUDINARY_API_KEY=votre_api_key
+CLOUDINARY_API_SECRET=votre_api_secret
 ```
 
 ### 4. Initialiser la base de donnees
@@ -202,7 +209,7 @@ pnpm build                # Build de tous les projets
 pnpm lint                 # Lint de tous les projets
 
 # --- Docker ---
-pnpm docker:up            # Demarrer PostgreSQL + Redis + MinIO
+pnpm docker:up            # Demarrer PostgreSQL + Redis
 pnpm docker:down          # Arreter les services Docker
 pnpm docker:logs          # Voir les logs Docker
 

@@ -5,7 +5,7 @@ WORKDIR /app
 RUN npm install -g pnpm
 
 COPY package.json ./
-RUN pnpm install --frozen-lockfile
+RUN pnpm install
 
 COPY . .
 RUN pnpm prisma generate
@@ -19,7 +19,7 @@ WORKDIR /app
 RUN npm install -g pnpm
 
 COPY package.json ./
-RUN pnpm install --prod --frozen-lockfile
+RUN pnpm install --prod
 
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma

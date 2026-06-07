@@ -23,7 +23,7 @@ export async function registerPushToken(): Promise<void> {
 
     if (Platform.OS === 'android') {
       await Notifications.setNotificationChannelAsync('default', {
-        name: 'SignalTogo',
+        name: 'Signal Urbain Togo',
         importance: Notifications.AndroidImportance.MAX,
         vibrationPattern: [0, 250, 250, 250],
         lightColor: '#1A472A',

@@ -25,17 +25,6 @@ services:
       - redis_data:/data
     command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-signal_redis}
 
-  minio:
-    image: minio/minio:latest
-    container_name: signal_minio
-    restart: always
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-signal_minio}
-      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-signal_minio_secret}
-    volumes:
-      - minio_data:/data
-    command: server /data --console-address ":9001"
-
   api:
     build:
       context: ./apps/api
@@ -51,7 +40,6 @@ services:
     environment:
       DATABASE_URL: postgresql://signal:${DB_PASSWORD:-signal_password}@postgres:5432/signal_urbain
       REDIS_URL: redis://:${REDIS_PASSWORD:-signal_redis}@redis:6379
-      MINIO_ENDPOINT: minio
     deploy:
       replicas: 2
 
@@ -79,7 +67,6 @@ services:
 volumes:
   postgres_data:
   redis_data:
-  minio_data:
 
 networks:
   default:

@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "SignalTogo",
+    "name": "Signal Urbain Togo",
     "slug": "signal-togo",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -39,7 +39,7 @@
       "supportsTablet": false,
       "bundleIdentifier": "tg.signalurbain.app",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "SignalTogo utilise votre position pour localiser l'incident.",
+        "NSLocationWhenInUseUsageDescription": "Signal Urbain Togo utilise votre position pour localiser l'incident.",
         "NSCameraUsageDescription": "Prenez une photo de l'incident pour votre signalement.",
         "NSPhotoLibraryUsageDescription": "Sélectionnez une photo de l'incident depuis votre galerie."
       }

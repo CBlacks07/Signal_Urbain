@@ -3,14 +3,14 @@ import {
   LayoutDashboard, FileText, Map, Users, BarChart2, Settings,
   AlertTriangle, Clock, Activity, CheckCircle2, Search, MapPin,
   Building2, Calendar, MessageSquare, Building, Zap, X, Check,
-  ChevronRight, LogOut, Phone, ArrowUp,
+  ChevronRight, LogOut, ArrowUp,
 } from "lucide-react";
 import axios from "axios";
 import { MapContainer, TileLayer, CircleMarker, Popup } from "react-leaflet";
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 
-const API_BASE = "/api/v1";
+const API_BASE = import.meta.env.VITE_API_URL || "/api/v1";
 
 const CATEGORIES: Record<string, { label: string; color: string }> = {
   inondation:  { label: "Inondation",          color: "#2B7A9B" },
@@ -151,7 +151,7 @@ function LoginView({ onLogin }: { onLogin: (token: string) => void }) {
       const token = data.access_token ?? data.accessToken;
       const decoded = decodeJwt(token);
       if (!decoded || decoded.role === "CITIZEN") {
-        setError("Accès refusé. Ce tableau de bord est réservé aux agents et administrateurs. Utilisez l'application mobile SignalTogo.");
+        setError("Accès refusé. Ce tableau de bord est réservé aux agents et administrateurs. Utilisez l'application mobile Signal Urbain Togo.");
         return;
       }
       saveToken(token);
@@ -178,9 +178,7 @@ function LoginView({ onLogin }: { onLogin: (token: string) => void }) {
     <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#F5F3EF" }}>
       <div style={{ width: 380, background: "#fff", borderRadius: 20, padding: 40, border: "1px solid #ede9e3", boxShadow: "0 8px 40px rgba(0,0,0,0.06)" }}>
         <div style={{ marginBottom: 32, textAlign: "center" }}>
-          <div style={{ width: 48, height: 48, borderRadius: 14, background: "linear-gradient(135deg, #D4760A, #E8950F)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
-            <Phone size={22} color="#fff" />
-          </div>
+          <img src="/logo.png" alt="Signal Urbain" style={{ width: 64, height: 64, borderRadius: 16, objectFit: "cover", margin: "0 auto 16px", display: "block" }} />
           <div style={{ fontSize: 22, fontWeight: 800, color: "#1a1a1a", fontFamily: "'Outfit', sans-serif" }}>Signal<span style={{ color: "#D4760A" }}>Urbain</span></div>
           <div style={{ fontSize: 13, color: "#999", marginTop: 4 }}>Espace Mairie — Connexion</div>
         </div>
@@ -248,7 +246,7 @@ function Sidebar({ active, onNav, collapsed, onToggle, onLogout, isSuperAdmin, i
       position: "relative", zIndex: 10,
     }}>
       <div style={{ padding: collapsed ? "20px 0" : 20, display: "flex", alignItems: "center", justifyContent: collapsed ? "center" : "flex-start", gap: 10, borderBottom: "1px solid rgba(255,255,255,0.08)", marginBottom: 8 }}>
-        <div style={{ width: 34, height: 34, minWidth: 34, borderRadius: 10, background: "linear-gradient(135deg, #D4760A, #E8950F)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800, color: "#fff", letterSpacing: "0.05em" }}>SU</div>
+        <img src="/logo.png" alt="Signal Urbain" style={{ width: 34, height: 34, minWidth: 34, borderRadius: 10, objectFit: "cover" }} />
         {!collapsed && (
           <div>
             <div style={{ fontSize: 15, fontWeight: 800, color: "#fff", lineHeight: 1.1 }}>Signal<span style={{ color: "#D4760A" }}>Urbain</span></div>
@@ -422,7 +420,7 @@ function TopBar({ token, me }: { token: string; me: any }) {
                 Notifications {unread > 0 && <span style={{ fontSize: 11, color: "#D4760A", fontWeight: 800 }}>({unread} non lues)</span>}
               </div>
               {unread > 0 && (
-                <button onClick={markAll} disabled={marking} style={{ fontSize: 11, color: "#1A472A", fontWeight: 700, background: "none", border: "none", cursor: "pointer", padding: "4px 8px", borderRadius: 6, background: "#E8F5E9" } as any}>
+                <button onClick={markAll} disabled={marking} style={{ fontSize: 11, color: "#1A472A", fontWeight: 700, border: "none", cursor: "pointer", padding: "4px 8px", borderRadius: 6, background: "#E8F5E9" } as any}>
                   {marking ? "..." : "Tout lire"}
                 </button>
               )}

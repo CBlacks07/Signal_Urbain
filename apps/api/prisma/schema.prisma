@@ -1,4 +1,4 @@
-// ─── Prisma Schema — SignalTogo ───────────────────────────────────────────────
+// ─── Prisma Schema — Signal Urbain Togo ───────────────────────────────────────
 // PostgreSQL 16 + PostGIS via extension
 // Note: la colonne `location` (GEOGRAPHY) est gérée via SQL raw dans les migrations
 // car Prisma ne supporte pas nativement PostGIS. On utilise Float lat/lng + raw queries.
