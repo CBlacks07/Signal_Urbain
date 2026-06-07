@@ -1,8 +1,7 @@
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 
-// Sur émulateur Android → 10.0.2.2 | iOS simulator → localhost | Appareil physique → IP de la machine
-export const API_BASE = 'http://192.168.1.39:3015/api/v1';
+export const API_BASE = 'https://signal-urbain.onrender.com/api/v1';
 export const TOKEN_KEY = 'signal_token';
 
 export const getToken = () => SecureStore.getItemAsync(TOKEN_KEY);
