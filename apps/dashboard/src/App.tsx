@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import axios from "axios";
 import { MapContainer, TileLayer, CircleMarker, Popup } from "react-leaflet";
+import { ToastHost, showError } from "./toast";
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 
@@ -74,6 +75,20 @@ function mapIncident(raw: any) {
     lat: raw.latitude ?? null,
     lng: raw.longitude ?? null,
   };
+}
+
+// ─── RESPONSIVE ──────────────────────────────────────────────────────────────
+
+function useMediaQuery(maxWidth: number) {
+  const [matches, setMatches] = useState(() => window.innerWidth <= maxWidth);
+  useEffect(() => {
+    const mql = window.matchMedia(`(max-width: ${maxWidth}px)`);
+    const onChange = () => setMatches(mql.matches);
+    onChange();
+    mql.addEventListener("change", onChange);
+    return () => mql.removeEventListener("change", onChange);
+  }, [maxWidth]);
+  return matches;
 }
 
 // ─── MICRO COMPONENTS ────────────────────────────────────────────────────────
@@ -350,14 +365,18 @@ function TopBar({ token, me }: { token: string; me: any }) {
     try {
       const { data } = await apiClient(token).get("/notifications/unread-count");
       setUnread(typeof data === "number" ? data : data?.count ?? 0);
-    } catch {}
+    } catch {
+      // Échec silencieux : ne pas spammer l'utilisateur pour un polling en arrière-plan
+    }
   }, [token]);
 
   const loadNotifs = async () => {
     try {
       const { data } = await apiClient(token).get("/notifications?limit=10");
       setNotifs(data?.data ?? data ?? []);
-    } catch {}
+    } catch {
+      showError("Impossible de charger les notifications");
+    }
   };
 
   const markAll = async () => {
@@ -366,7 +385,9 @@ function TopBar({ token, me }: { token: string; me: any }) {
       await apiClient(token).patch("/notifications/read-all");
       setUnread(0);
       setNotifs(prev => prev.map(n => ({ ...n, isRead: true })));
-    } catch {}
+    } catch {
+      showError("Impossible de marquer les notifications comme lues");
+    }
     finally { setMarking(false); }
   };
 
@@ -467,6 +488,7 @@ function TopBar({ token, me }: { token: string; me: any }) {
 // ─── DASHBOARD VIEW ───────────────────────────────────────────────────────────
 
 function DashboardView({ reports, onOpenDetail }: any) {
+  const isNarrow    = useMediaQuery(860);
   const critiques   = reports.filter((r: any) => r.priority === "critique" && r.status !== "resolu");
   const resolus     = reports.filter((r: any) => r.status === "resolu").length;
   const enAttente   = reports.filter((r: any) => r.status === "signale").length;
@@ -488,7 +510,7 @@ function DashboardView({ reports, onOpenDetail }: any) {
         <StatCard icon={CheckCircle2}  label="Résolus"          value={resolus}        trend={reports.length ? `${Math.round(resolus / reports.length * 100)}% résolution` : undefined} trendUp={true} color="#2E7D32" delay={0.15} />
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isNarrow ? "1fr" : "1fr 1fr", gap: 20 }}>
         {/* Incidents critiques */}
         <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #ede9e3", overflow: "hidden" }}>
           <div style={{ padding: "16px 20px", borderBottom: "1px solid #f5f2ed", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -604,6 +626,8 @@ function IncidentsView({ reports, onOpenDetail }: any) {
       </div>
 
       <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #ede9e3", overflow: "hidden" }}>
+        <div style={{ overflowX: "auto" }}>
+        <div style={{ minWidth: 760 }}>
         <div style={{ display: "grid", gridTemplateColumns: "110px 2fr 140px 130px 100px 90px 70px", padding: "12px 20px", background: "#faf8f5", borderBottom: "1px solid #ede9e3", fontSize: 10.5, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em" }}>
           <span>ID</span><span>Description</span><span>Localisation</span><span>Catégorie</span><span>Statut</span><span>Priorité</span><span style={{ textAlign: "right" }}>Votes</span>
         </div>
@@ -634,6 +658,8 @@ function IncidentsView({ reports, onOpenDetail }: any) {
             </div>
           );
         })}
+        </div>
+        </div>
       </div>
     </div>
   );
@@ -642,6 +668,7 @@ function IncidentsView({ reports, onOpenDetail }: any) {
 // ─── DETAIL PANEL ─────────────────────────────────────────────────────────────
 
 function DetailPanel({ report, agents, onClose, onUpdateStatus, token, onRefresh }: any) {
+  const isNarrow = useMediaQuery(640);
   const [newStatus, setNewStatus]     = useState(report.status);
   const [assignTo, setAssignTo]       = useState(report.agent?._id ?? "");
   const [assigning, setAssigning]     = useState(false);
@@ -662,7 +689,7 @@ function DetailPanel({ report, agents, onClose, onUpdateStatus, token, onRefresh
       setFullData(data);
       setComments(data.comments ?? []);
       setHistory(data.statusHistory ?? []);
-    }).catch(() => {});
+    }).catch(() => showError("Impossible de charger le détail de l'incident"));
   }, [report._id, token]);
 
   const sendComment = async () => {
@@ -673,7 +700,9 @@ function DetailPanel({ report, agents, onClose, onUpdateStatus, token, onRefresh
       setNewComment("");
       const { data } = await apiClient(token).get(`/incidents/${report._id}/comments`);
       setComments(data ?? []);
-    } catch {}
+    } catch {
+      showError("Impossible d'envoyer le commentaire");
+    }
     finally { setSendingComment(false); }
   };
 
@@ -689,7 +718,7 @@ function DetailPanel({ report, agents, onClose, onUpdateStatus, token, onRefresh
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 500, display: "flex", justifyContent: "flex-end", animation: "fadeIn 0.2s ease" }}>
       <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.35)", backdropFilter: "blur(4px)" }} />
-      <div style={{ position: "relative", width: 520, maxWidth: "90vw", background: "#FDFCFA", height: "100vh", overflowY: "auto", boxShadow: "-8px 0 40px rgba(0,0,0,0.12)", animation: "slideInRight 0.35s cubic-bezier(0.4,0,0.2,1)" }}>
+      <div style={{ position: "relative", width: isNarrow ? "100vw" : 520, maxWidth: "100vw", background: "#FDFCFA", height: "100vh", overflowY: "auto", boxShadow: "-8px 0 40px rgba(0,0,0,0.12)", animation: "slideInRight 0.35s cubic-bezier(0.4,0,0.2,1)" }}>
 
         {/* Header */}
         <div style={{ padding: "20px 24px", borderBottom: "1px solid #ede9e3", display: "flex", justifyContent: "space-between", alignItems: "flex-start", position: "sticky", top: 0, background: "#FDFCFA", zIndex: 2 }}>
@@ -746,7 +775,7 @@ function DetailPanel({ report, agents, onClose, onUpdateStatus, token, onRefresh
             </div>
           )}
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
+          <div style={{ display: "grid", gridTemplateColumns: isNarrow ? "1fr" : "1fr 1fr", gap: 12, marginBottom: 20 }}>
             {INFO.map(({ Icon, label, value }) => (
               <div key={label} style={{ padding: 12, background: "#faf8f5", borderRadius: 12 }}>
                 <div style={{ fontSize: 10, color: "#aaa", fontWeight: 600, textTransform: "uppercase", marginBottom: 4, display: "flex", alignItems: "center", gap: 4 }}>
@@ -810,7 +839,9 @@ function DetailPanel({ report, agents, onClose, onUpdateStatus, token, onRefresh
                     try {
                       await apiClient(token).patch(`/incidents/${report._id}`, { assignedTo: assignTo || null });
                       onRefresh?.();
-                    } catch {}
+                    } catch {
+                      showError("Impossible d'assigner cet incident");
+                    }
                     finally { setAssigning(false); }
                   }} disabled={assigning}
                     style={{ padding: "10px 14px", background: "#E3F2FD", color: "#1565C0", border: "none", borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
@@ -905,6 +936,7 @@ function DetailPanel({ report, agents, onClose, onUpdateStatus, token, onRefresh
 const SERVICES = ["Voirie", "Électricité", "Hydraulique", "Environnement", "Éclairage public", "Autre"];
 
 function EquipesView({ token, agents, onRefresh }: any) {
+  const isNarrow = useMediaQuery(700);
   const [tab, setTab]             = useState<"agents" | "citoyens">("agents");
   const [showForm, setShowForm]   = useState(false);
   const [form, setForm]           = useState({ phone: "", name: "", service: "" });
@@ -920,7 +952,9 @@ function EquipesView({ token, agents, onRefresh }: any) {
     try {
       const { data } = await apiClient(token).get("/users/citizens");
       setCitizens(data ?? []);
-    } catch {}
+    } catch {
+      showError("Impossible de charger la liste des citoyens");
+    }
     finally { setCitizensLoading(false); }
   }, [token]);
 
@@ -933,7 +967,9 @@ function EquipesView({ token, agents, onRefresh }: any) {
       await apiClient(token).patch(`/users/agents/${id}`, { role: "AGENT" });
       setCitizens(prev => prev.filter(c => c.id !== id));
       onRefresh();
-    } catch {}
+    } catch {
+      showError(`Impossible de promouvoir ${name} au rôle Agent`);
+    }
     finally { setPromoting(null); }
   };
 
@@ -957,7 +993,9 @@ function EquipesView({ token, agents, onRefresh }: any) {
     try {
       await apiClient(token).delete(`/users/agents/${id}`);
       onRefresh();
-    } catch {}
+    } catch {
+      showError(`Impossible de supprimer l'agent ${name}`);
+    }
   };
 
   const filteredCitizens = search
@@ -995,7 +1033,7 @@ function EquipesView({ token, agents, onRefresh }: any) {
       {showForm && (
         <div style={{ background: "#fff", border: "1.5px solid #ede9e3", borderRadius: 16, padding: 24, marginBottom: 20, animation: "cardIn 0.3s ease" }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a", marginBottom: 16 }}>Nouvel agent</div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 16 }}>
+          <div style={{ display: "grid", gridTemplateColumns: isNarrow ? "1fr" : "1fr 1fr 1fr", gap: 12, marginBottom: 16 }}>
             {[
               { label: "Téléphone", key: "phone", placeholder: "+22890000000" },
               { label: "Nom complet", key: "name", placeholder: "Ex: Kossi Ablé" },
@@ -1060,7 +1098,7 @@ function EquipesView({ token, agents, onRefresh }: any) {
                     </div>
                   )}
 
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: isNarrow ? "1fr" : "1fr 1fr", gap: 8, marginBottom: 16 }}>
                     {[
                       { label: "Assignés",  value: agent._count?.assignedIncidents ?? 0, color: "#1565C0" },
                       { label: "Résolus",   value: agent.resolvedCount ?? 0,             color: "#2E7D32" },
@@ -1106,6 +1144,8 @@ function EquipesView({ token, agents, onRefresh }: any) {
             </div>
           ) : (
             <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #ede9e3", overflow: "hidden" }}>
+            <div style={{ overflowX: "auto" }}>
+            <div style={{ minWidth: 640 }}>
               {/* En-tête tableau */}
               <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 80px 80px 140px", gap: 12, padding: "10px 20px", background: "#faf8f5", borderBottom: "1px solid #ede9e3", fontSize: 10.5, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: 0.5 }}>
                 <span>Citoyen</span>
@@ -1162,6 +1202,8 @@ function EquipesView({ token, agents, onRefresh }: any) {
                 );
               })}
             </div>
+            </div>
+            </div>
           )}
         </div>
       )}
@@ -1172,6 +1214,7 @@ function EquipesView({ token, agents, onRefresh }: any) {
 // ─── STATS VIEW ───────────────────────────────────────────────────────────────
 
 function StatsView({ reports }: any) {
+  const isNarrow = useMediaQuery(860);
   const byCommune: Record<string, number> = {};
   reports.forEach((r: any) => { byCommune[r.commune] = (byCommune[r.commune] || 0) + 1; });
   const maxC = Math.max(...Object.values(byCommune), 1);
@@ -1180,7 +1223,7 @@ function StatsView({ reports }: any) {
     <div style={{ animation: "fadeIn 0.4s ease" }}>
       <h1 style={{ fontSize: 26, fontWeight: 800, color: "#1a1a1a", margin: "0 0 4px", fontFamily: "'Outfit', sans-serif" }}>Statistiques</h1>
       <p style={{ fontSize: 13, color: "#999", margin: "0 0 24px" }}>Analyse des signalements</p>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isNarrow ? "1fr" : "1fr 1fr", gap: 20 }}>
         <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #ede9e3", padding: 20 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14, fontWeight: 700, color: "#1a1a1a", marginBottom: 16 }}>
             <Building2 size={15} color="#1A472A" /> Par commune
@@ -1519,6 +1562,7 @@ function CarteView({ reports, onOpenDetail }: any) {
 // ─── SUPER ADMIN : COMMUNES ───────────────────────────────────────────────────
 
 function CommunesAdminView({ token }: any) {
+  const isNarrow = useMediaQuery(700);
   const [communes, setCommunes] = useState<any[]>([]);
   const [loading, setLoading]   = useState(true);
   const [form, setForm]         = useState({ name: "", prefecture: "", contactEmail: "" });
@@ -1563,7 +1607,7 @@ function CommunesAdminView({ token }: any) {
 
       {showForm && (
         <div style={{ background: "#fff", borderRadius: 16, padding: 20, marginBottom: 20, border: "1px solid #ede9e3" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: isNarrow ? "1fr" : "1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
             {(["name:Nom *", "prefecture:Préfecture *", "contactEmail:Email contact"] as string[]).map(f => {
               const [key, lbl] = f.split(":");
               return (
@@ -1702,8 +1746,9 @@ function UsersAdminView({ token }: any) {
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 
 export default function MairieDashboard() {
+  const isNarrow = useMediaQuery(860);
   const [page, setPage]                 = useState("dashboard");
-  const [collapsed, setCollapsed]       = useState(false);
+  const [collapsed, setCollapsed]       = useState(() => window.innerWidth <= 860);
   const [reports, setReports]           = useState<any[]>([]);
   const [agents, setAgents]             = useState<any[]>([]);
   const [detailReport, setDetailReport] = useState<any>(null);
@@ -1717,7 +1762,12 @@ export default function MairieDashboard() {
   const isAgent      = userRole === "AGENT";
 
   const fetchMe = useCallback(async (tok: string) => {
-    try { const { data } = await apiClient(tok).get("/users/me"); setMe(data); } catch {}
+    try {
+      const { data } = await apiClient(tok).get("/users/me");
+      setMe(data);
+    } catch {
+      showError("Impossible de charger votre profil");
+    }
   }, []);
 
   const fetchIncidents = useCallback(async (tok: string) => {
@@ -1725,7 +1775,9 @@ export default function MairieDashboard() {
     try {
       const { data } = await apiClient(tok).get("/incidents", { params: { limit: 100 } });
       setReports((data.data ?? []).map(mapIncident));
-    } catch {}
+    } catch {
+      showError("Impossible de charger les incidents");
+    }
     finally { setLoading(false); }
   }, []);
 
@@ -1733,7 +1785,9 @@ export default function MairieDashboard() {
     try {
       const { data } = await apiClient(tok).get("/users/agents");
       setAgents(data);
-    } catch {}
+    } catch {
+      showError("Impossible de charger la liste des agents");
+    }
   }, []);
 
   useEffect(() => {
@@ -1744,22 +1798,31 @@ export default function MairieDashboard() {
     }
   }, [token, fetchIncidents, fetchAgents, fetchMe, isAdmin]);
 
+  // Replie automatiquement la barre latérale sur petit écran (tablette / portrait)
+  useEffect(() => { if (isNarrow) setCollapsed(true); }, [isNarrow]);
+
   const handleLogin = (tok: string) => { setToken(tok); fetchMe(tok); };
 
   const handleLogout = () => { clearToken(); setToken(null); setReports([]); setAgents([]); setMe(null); };
 
   const updateStatus = async (incidentId: string, newStatus: string) => {
     if (token) {
-      try { await apiClient(token).patch(`/incidents/${incidentId}`, { status: newStatus.toUpperCase() }); } catch {}
+      try {
+        await apiClient(token).patch(`/incidents/${incidentId}`, { status: newStatus.toUpperCase() });
+      } catch {
+        showError("Impossible de mettre à jour le statut de l'incident");
+        return;
+      }
     }
     setReports(prev => prev.map(r => r._id === incidentId ? { ...r, status: newStatus } : r));
   };
 
-  if (!token) return <LoginView onLogin={handleLogin} />;
-  if (!userRole || userRole === "CITIZEN") { handleLogout(); return <LoginView onLogin={handleLogin} />; }
+  if (!token) return <><LoginView onLogin={handleLogin} /><ToastHost /></>;
+  if (!userRole || userRole === "CITIZEN") { handleLogout(); return <><LoginView onLogin={handleLogin} /><ToastHost /></>; }
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: "#F5F3EF", fontFamily: "'DM Sans', system-ui, sans-serif" }}>
+      <ToastHost />
       <style>{`
         @keyframes fadeIn    { from { opacity: 0; }                       to { opacity: 1; } }
         @keyframes cardIn    { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
