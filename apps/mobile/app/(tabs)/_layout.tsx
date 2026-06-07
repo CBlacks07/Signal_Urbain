@@ -1,5 +1,6 @@
 import { Tabs } from 'expo-router';
 import { View, Text, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const COLORS = { dark: '#1A472A', orange: '#D4760A' };
 
@@ -51,6 +52,8 @@ function ProfileIcon({ color, size = 22 }: { color: string; size?: number }) {
 }
 
 export default function TabsLayout() {
+  const insets = useSafeAreaInsets();
+
   return (
     <Tabs
       screenOptions={{
@@ -59,8 +62,8 @@ export default function TabsLayout() {
           backgroundColor: '#fff',
           borderTopColor: '#EDECEA',
           borderTopWidth: 1,
-          height: 72,
-          paddingBottom: 12,
+          height: 60 + insets.bottom,
+          paddingBottom: 8 + insets.bottom,
           paddingTop: 8,
           elevation: 8,
           shadowColor: '#000',

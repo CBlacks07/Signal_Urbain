@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { getToken } from '../lib/api';
 import { router } from 'expo-router';
 
@@ -26,13 +27,13 @@ export default function RootLayout() {
   if (!checked) return null;
 
   return (
-    <>
+    <SafeAreaProvider>
       <StatusBar style="dark" />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="login" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="incident/[id]" options={{ presentation: 'card' }} />
       </Stack>
-    </>
+    </SafeAreaProvider>
   );
 }
