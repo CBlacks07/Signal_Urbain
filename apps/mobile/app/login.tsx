@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, Image } from 'react-native';
 import { router } from 'expo-router';
 import { apiClient, saveToken, API_BASE } from '../lib/api';
 
-const COLORS = { dark: '#1A472A', orange: '#D4760A', bg: '#FDFCFA' };
+const COLORS = { dark: '#1A472A', bg: '#FDFCFA' };
 
 export default function LoginScreen() {
   const [step, setStep]           = useState<'phone' | 'otp'>('phone');
@@ -46,11 +46,7 @@ export default function LoginScreen() {
       <View style={styles.inner}>
         {/* Logo */}
         <View style={styles.logoWrap}>
-          <View style={styles.logoIcon}>
-            <Text style={{ fontSize: 28, color: '#fff', fontWeight: '800' }}>S</Text>
-          </View>
-          <Text style={styles.logoText}>Signal<Text style={{ color: COLORS.orange }}>Togo</Text></Text>
-          <Text style={styles.logoSub}>Signalement citoyen — Togo</Text>
+          <Image source={require('../assets/icon.png')} style={styles.logoImage} resizeMode="contain" />
         </View>
 
         {/* Card */}
@@ -107,9 +103,7 @@ const styles = StyleSheet.create({
   container:  { flex: 1, backgroundColor: '#EDECEA' },
   inner:      { flex: 1, justifyContent: 'center', padding: 24 },
   logoWrap:   { alignItems: 'center', marginBottom: 32 },
-  logoIcon:   { width: 64, height: 64, borderRadius: 20, backgroundColor: COLORS.orange, alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
-  logoText:   { fontSize: 26, fontWeight: '800', color: '#1A1A1A' },
-  logoSub:    { fontSize: 12, color: '#888', marginTop: 4 },
+  logoImage:  { width: 160, height: 160 },
   card:       { backgroundColor: '#fff', borderRadius: 24, padding: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 16, elevation: 6 },
   cardTitle:  { fontSize: 20, fontWeight: '800', color: '#1A1A1A', marginBottom: 4 },
   cardSub:    { fontSize: 13, color: '#999', marginBottom: 20 },

@@ -193,8 +193,7 @@ function LoginView({ onLogin }: { onLogin: (token: string) => void }) {
     <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#F5F3EF" }}>
       <div style={{ width: 380, background: "#fff", borderRadius: 20, padding: 40, border: "1px solid #ede9e3", boxShadow: "0 8px 40px rgba(0,0,0,0.06)" }}>
         <div style={{ marginBottom: 32, textAlign: "center" }}>
-          <img src="/logo.png" alt="Signal Urbain" style={{ width: 64, height: 64, borderRadius: 16, objectFit: "cover", margin: "0 auto 16px", display: "block" }} />
-          <div style={{ fontSize: 22, fontWeight: 800, color: "#1a1a1a", fontFamily: "'Outfit', sans-serif" }}>Signal<span style={{ color: "#D4760A" }}>Urbain</span></div>
+          <img src="/logo.png" alt="Signal Urbain Togo" style={{ width: 200, height: 200, objectFit: "contain", margin: "0 auto 8px", display: "block" }} />
           <div style={{ fontSize: 13, color: "#999", marginTop: 4 }}>Espace Mairie — Connexion</div>
         </div>
 
