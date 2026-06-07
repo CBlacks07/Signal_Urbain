@@ -3,7 +3,7 @@ import {
   LayoutDashboard, FileText, Map, Users, BarChart2, Settings,
   AlertTriangle, Clock, Activity, CheckCircle2, Search, MapPin,
   Building2, Calendar, MessageSquare, Building, Zap, X, Check,
-  ChevronRight, LogOut, ArrowUp,
+  ChevronRight, LogOut, ArrowUp, Image,
 } from "lucide-react";
 import axios from "axios";
 import { MapContainer, TileLayer, CircleMarker, Popup } from "react-leaflet";
@@ -729,6 +729,22 @@ function DetailPanel({ report, agents, onClose, onUpdateStatus, token, onRefresh
             <label style={{ fontSize: 10.5, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.1em" }}>Description</label>
             <p style={{ fontSize: 14, color: "#333", lineHeight: 1.6, margin: "8px 0 0" }}>{report.desc}</p>
           </div>
+
+          {fullData?.photos?.length > 0 && (
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ fontSize: 10.5, fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.1em", display: "flex", alignItems: "center", gap: 5 }}>
+                <Image size={11} /> Photos ({fullData.photos.length})
+              </label>
+              <div style={{ display: "flex", gap: 8, marginTop: 10, overflowX: "auto", paddingBottom: 4 }}>
+                {fullData.photos.map((photo: any) => (
+                  <a key={photo.id} href={photo.url} target="_blank" rel="noopener noreferrer" style={{ flexShrink: 0 }}>
+                    <img src={photo.thumbnailUrl || photo.url} alt="Photo de l'incident" loading="lazy"
+                      style={{ width: 100, height: 100, objectFit: "cover", borderRadius: 12, border: "1.5px solid #ede9e3", display: "block" }} />
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
             {INFO.map(({ Icon, label, value }) => (
