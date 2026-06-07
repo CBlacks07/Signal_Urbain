@@ -70,7 +70,7 @@ export class AuthService {
   async refreshToken(refreshToken: string) {
     try {
       const payload = this.jwt.verify(refreshToken, {
-        secret: this.config.get('JWT_SECRET') + '_refresh',
+        secret: this.refreshSecret(),
       });
       const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
       if (!user) throw new UnauthorizedException();
@@ -87,10 +87,16 @@ export class AuthService {
         expiresIn: this.config.get('JWT_ACCESS_EXPIRES', '15m'),
       }),
       refresh_token: this.jwt.sign(payload, {
-        secret: this.config.get('JWT_SECRET') + '_refresh',
+        secret: this.refreshSecret(),
         expiresIn: this.config.get('JWT_REFRESH_EXPIRES', '30d'),
       }),
     };
+  }
+
+  // Secret dedie pour les refresh tokens, avec repli sur l'ancien schema derive
+  // (compatibilite avec les sessions existantes tant que JWT_REFRESH_SECRET n'est pas defini)
+  private refreshSecret(): string {
+    return this.config.get<string>('JWT_REFRESH_SECRET') ?? this.config.get('JWT_SECRET') + '_refresh';
   }
 
   private normalizePhone(phone: string): string {

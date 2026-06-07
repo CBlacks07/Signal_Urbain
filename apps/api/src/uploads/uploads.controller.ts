@@ -1,4 +1,4 @@
-import { Controller, Post, UseInterceptors, UploadedFile, UseGuards } from '@nestjs/common';
+import { Controller, Post, UseInterceptors, UploadedFile, UseGuards, ParseFilePipeBuilder, HttpStatus } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
@@ -17,8 +17,16 @@ export class UploadsController {
   @Post('photo')
   @Roles(Role.CITIZEN)
   @ApiConsumes('multipart/form-data')
-  @UseInterceptors(FileInterceptor('file'))
-  uploadPhoto(@UploadedFile() file: Express.Multer.File) {
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024 } }))
+  uploadPhoto(
+    @UploadedFile(
+      new ParseFilePipeBuilder()
+        .addFileTypeValidator({ fileType: /^image\/(jpe?g|png|webp|heic|heif)$/ })
+        .addMaxSizeValidator({ maxSize: 10 * 1024 * 1024 })
+        .build({ errorHttpStatusCode: HttpStatus.UNPROCESSABLE_ENTITY, fileIsRequired: true }),
+    )
+    file: Express.Multer.File,
+  ) {
     return this.uploads.uploadPhoto(file);
   }
 }

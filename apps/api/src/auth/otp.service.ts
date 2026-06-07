@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { randomInt } from 'node:crypto';
 import { PrismaService } from '../common/prisma/prisma.service';
 
 @Injectable()
@@ -12,7 +13,7 @@ export class OtpService {
   ) {}
 
   async generateAndSend(phone: string): Promise<string> {
-    const code = Math.floor(100_000 + Math.random() * 900_000).toString();
+    const code = randomInt(100_000, 1_000_000).toString();
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
 
     // Trouve ou crée l'user pour lier le code

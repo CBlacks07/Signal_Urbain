@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
-import { ThrottlerModule } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { PrismaModule } from './common/prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
@@ -22,12 +23,15 @@ import { AdminModule } from './admin/admin.module';
     }),
 
     // ─── Rate limiting ──────────────────────────────────
-    ThrottlerModule.forRoot([
-      {
-        ttl: 60_000,
-        limit: 100,
-      },
-    ]),
+    ThrottlerModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => [
+        {
+          ttl: config.get<number>('THROTTLE_TTL', 60_000),
+          limit: config.get<number>('THROTTLE_LIMIT', 100),
+        },
+      ],
+    }),
 
     // ─── Database (Prisma) ──────────────────────────────
     PrismaModule,
@@ -43,6 +47,9 @@ import { AdminModule } from './admin/admin.module';
     CommunesModule,
     WebsocketModule,
     AdminModule,
+  ],
+  providers: [
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],
 })
 export class AppModule {}
