@@ -1,0 +1,34 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'DM Sans', system-ui, sans-serif;
+    background: #F5F3EF;
+    margin: 0;
+  }
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #d4d0c8; border-radius: 3px; }
+}
+
+@layer utilities {
+  .animate-fade-in { animation: fadeIn 0.4s ease; }
+  .animate-card-in { animation: cardIn 0.5s ease both; }
+  .animate-slide-right { animation: slideInRight 0.35s cubic-bezier(0.4,0,0.2,1); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes cardIn {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes slideInRight {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}

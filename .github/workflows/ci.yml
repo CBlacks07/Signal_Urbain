@@ -1,0 +1,145 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+env:
+  NODE_VERSION: '22'
+  PNPM_VERSION: '9.4.0'
+
+jobs:
+  lint:
+    name: Lint & Format Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint code
+        run: pnpm lint
+
+      - name: Check formatting
+        run: pnpm format:check
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        app: [api, dashboard]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build ${{ matrix.app }}
+        run: pnpm --filter @signal/${{ matrix.app }} build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.app }}-build
+          path: apps/${{ matrix.app }}/dist
+
+  test:
+    name: Test API
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: signal
+          POSTGRES_PASSWORD: signal_password
+          POSTGRES_DB: signal_urbain_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Setup test database
+        env:
+          DATABASE_URL: postgresql://signal:signal_password@localhost:5432/signal_urbain_test?schema=public
+        run: |
+          pnpm --filter @signal/api prisma migrate deploy
+          pnpm --filter @signal/api prisma generate
+
+      - name: Run tests
+        env:
+          DATABASE_URL: postgresql://signal:signal_password@localhost:5432/signal_urbain_test?schema=public
+          REDIS_URL: redis://localhost:6379
+          JWT_SECRET: test_secret_key_very_long
+          SMS_PROVIDER: console
+        run: pnpm --filter @signal/api test
+
+      - name: Generate coverage
+        env:
+          DATABASE_URL: postgresql://signal:signal_password@localhost:5432/signal_urbain_test?schema=public
+          REDIS_URL: redis://localhost:6379
+          JWT_SECRET: test_secret_key_very_long
+          SMS_PROVIDER: console
+        run: pnpm --filter @signal/api test:cov
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./apps/api/coverage/coverage-final.json
+          flags: api
+          fail_ci_if_error: false

@@ -1,0 +1,240 @@
+// ─── Prisma Schema — SignalTogo ───────────────────────────────────────────────
+// PostgreSQL 16 + PostGIS via extension
+// Note: la colonne `location` (GEOGRAPHY) est gérée via SQL raw dans les migrations
+// car Prisma ne supporte pas nativement PostGIS. On utilise Float lat/lng + raw queries.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum Role {
+  CITIZEN
+  AGENT
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum IncidentCategory {
+  inondation
+  electrique
+  depotoir
+  route
+  eclairage
+  eau
+  autre
+}
+
+enum IncidentStatus {
+  SIGNALE
+  ASSIGNE
+  EN_COURS
+  RESOLU
+  REJETE
+}
+
+enum Priority {
+  CRITIQUE
+  HAUTE
+  MOYENNE
+  BASSE
+}
+
+enum NotificationType {
+  STATUS_UPDATE
+  NEW_COMMENT
+  UPVOTE
+  SYSTEM
+}
+
+// ─── Models ───────────────────────────────────────────────────────────────────
+
+model User {
+  id          String   @id @default(uuid())
+  phone       String   @unique
+  name        String
+  email       String?  @unique
+  role        Role     @default(CITIZEN)
+  communeId   String?
+  avatarUrl   String?
+  isVerified  Boolean  @default(false)
+  fcmToken    String?  // Firebase push token
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  commune           Commune?        @relation(fields: [communeId], references: [id])
+  reportedIncidents Incident[]      @relation("Reporter")
+  assignedIncidents Incident[]      @relation("AssignedAgent")
+  upvotes           Upvote[]
+  comments          Comment[]
+  statusChanges     StatusHistory[]
+  notifications     Notification[]
+  otpCodes          OtpCode[]
+
+  @@map("users")
+}
+
+model OtpCode {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  code      String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("otp_codes")
+}
+
+model Commune {
+  id           String   @id @default(uuid())
+  name         String   @unique
+  prefecture   String
+  // boundary stocké en GeoJSON dans une colonne text (PostGIS via migration raw)
+  contactEmail String?
+  contactPhone String?
+  createdAt    DateTime @default(now())
+
+  users     User[]
+  incidents Incident[]
+
+  @@map("communes")
+}
+
+model Incident {
+  id            String           @id @default(uuid())
+  refCode       String           @unique  // SIG-2026-XXXX
+  category      IncidentCategory
+  description   String
+  status        IncidentStatus   @default(SIGNALE)
+  priority      Priority         @default(MOYENNE)
+
+  // Localisation — lat/lng stockés séparément, colonne PostGIS gérée via migration
+  latitude      Float
+  longitude     Float
+  address       String
+
+  communeId     String
+  reporterId    String
+  assignedTo    String?
+  service       String?
+
+  upvotesCount  Int      @default(0)
+  commentsCount Int      @default(0)
+  resolvedAt    DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  commune       Commune        @relation(fields: [communeId], references: [id])
+  reporter      User           @relation("Reporter", fields: [reporterId], references: [id])
+  assignedAgent User?          @relation("AssignedAgent", fields: [assignedTo], references: [id])
+
+  photos        IncidentPhoto[]
+  upvotes       Upvote[]
+  comments      Comment[]
+  statusHistory StatusHistory[]
+  notifications Notification[]
+
+  @@index([status])
+  @@index([communeId])
+  @@index([priority])
+  @@index([createdAt(sort: Desc)])
+  @@index([communeId, status, priority])
+  @@map("incidents")
+}
+
+model IncidentPhoto {
+  id           String   @id @default(uuid())
+  incidentId   String
+  incident     Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  url          String
+  thumbnailUrl String
+  order        Int      @default(0)
+  createdAt    DateTime @default(now())
+
+  @@map("incident_photos")
+}
+
+model Upvote {
+  userId     String
+  incidentId String
+  createdAt  DateTime @default(now())
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  incident Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+
+  @@id([userId, incidentId])
+  @@map("upvotes")
+}
+
+model Comment {
+  id         String   @id @default(uuid())
+  incidentId String
+  userId     String
+  content    String
+  isInternal Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  incident Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([incidentId])
+  @@map("comments")
+}
+
+model StatusHistory {
+  id         String         @id @default(uuid())
+  incidentId String
+  oldStatus  IncidentStatus
+  newStatus  IncidentStatus
+  changedBy  String
+  note       String?
+  createdAt  DateTime       @default(now())
+
+  incident Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  agent    User     @relation(fields: [changedBy], references: [id])
+
+  @@index([incidentId])
+  @@map("status_history")
+}
+
+model Notification {
+  id         String           @id @default(uuid())
+  userId     String
+  type       NotificationType
+  title      String
+  body       String
+  incidentId String?
+  isRead     Boolean          @default(false)
+  createdAt  DateTime         @default(now())
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  incident Incident? @relation(fields: [incidentId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([isRead, userId])  // index pour filtrer les non-lus
+  @@map("notifications")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  action    String   // ex: "UPDATE_INCIDENT_STATUS"
+  entity    String   // ex: "Incident"
+  entityId  String
+  details   Json?
+  ip        String?
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@map("audit_logs")
+}

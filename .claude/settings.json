@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm --filter @signal/dashboard add leaflet react-leaflet @types/leaflet)",
+      "Bash(pnpm --filter @signal/dashboard add leaflet react-leaflet@4 @types/leaflet)",
+      "Bash(DATABASE_URL=\"postgresql://postgres:721RRTeJi5kiylmLxWAXc3ql1YzZWNnR@localhost:5432/signal_urbain?schema=public\" pnpm exec prisma db execute --stdin <<'EOF':*)",
+      "Bash(find '/c/Users/CCL/Desktop/Signal Urbain/apps/mobile/app/\\(tabs\\)' -type f)",
+      "Bash(pnpm db:seed)",
+      "Bash(npx expo:*)",
+      "Bash(pnpm add:*)",
+      "Bash(find 'c:/Users/CCL/Desktop/Signal Urbain' -iname *firebase* -type f)",
+      "Bash(cmd /c \"for /f \\\\\"tokens=5\\\\\" %a in \\('netstat -ano ^| findstr :3015 ^| findstr LISTENING'\\) do echo PID: %a\")",
+      "Bash(cmd /c \"ipconfig | findstr /C:\\\\\"IPv4\\\\\"\")",
+      "Bash(timeout 15)",
+      "Bash(cmd /c \"netstat -ano | findstr :5173\")",
+      "Bash(Get-ChildItem -Force)"
+    ]
+  }
+}

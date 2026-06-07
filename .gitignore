@@ -1,0 +1,29 @@
+node_modules/
+dist/
+build/
+.next/
+.expo/
+*.local
+.env
+.env.production
+
+# Logs
+logs/
+*.log
+
+# DB
+*.db
+*.sqlite
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/settings.json
+.idea/
+
+# Docker volumes (local)
+postgres_data/
+redis_data/
+minio_data/
