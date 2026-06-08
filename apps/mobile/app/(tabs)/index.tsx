@@ -69,16 +69,23 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError]         = useState('');
   const [upvotes, setUpvotes]     = useState<Record<string, UpvoteState>>({});
+  const [myCommune, setMyCommune] = useState<{ id: string | null; name: string | null }>({ id: null, name: null });
   const myUserIdRef               = useRef<string | null>(null);
+  const myCommuneRef              = useRef<{ id: string | null; name: string | null }>({ id: null, name: null });
 
   const fetchIncidents = useCallback(async () => {
     try {
       const token = await getToken();
-      const [incRes, meRes] = await Promise.all([
-        apiClient(token).get('/incidents?limit=50'),
-        myUserIdRef.current ? Promise.resolve(null) : apiClient(token).get('/users/me'),
-      ]);
-      if (meRes) myUserIdRef.current = meRes.data.id;
+      if (!myUserIdRef.current) {
+        const meRes = await apiClient(token).get('/users/me');
+        myUserIdRef.current = meRes.data.id;
+        myCommuneRef.current = { id: meRes.data.communeId ?? null, name: meRes.data.commune?.name ?? null };
+        setMyCommune(myCommuneRef.current);
+      }
+      const { id: communeId } = myCommuneRef.current;
+      const params = new URLSearchParams({ limit: '50' });
+      if (communeId) params.set('communeId', communeId);
+      const incRes = await apiClient(token).get(`/incidents?${params.toString()}`);
       const myId = myUserIdRef.current;
       const data = (incRes.data?.data ?? incRes.data ?? []).map((i: any) => ({
         ...i,
@@ -157,7 +164,9 @@ export default function HomeScreen() {
       <ScrollView showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.dark} />}>
         {/* Hero */}
         <View style={styles.hero}>
-          <Text style={styles.heroLabel}>LOME  --  SIGNALEMENTS ACTIFS</Text>
+          <Text style={styles.heroLabel}>
+            {myCommune.name ? `${myCommune.name.toUpperCase()}  --  SIGNALEMENTS ACTIFS` : 'SIGNALEMENTS ACTIFS'}
+          </Text>
           <View style={styles.heroCount}>
             <Text style={styles.heroNumber}>{counts.all}</Text>
             <Text style={styles.heroSub}>incidents reportes</Text>
@@ -176,6 +185,15 @@ export default function HomeScreen() {
             ))}
           </View>
         </View>
+
+        {!myCommune.id && (
+          <TouchableOpacity style={styles.communeBanner} onPress={() => router.push('/edit-profile')} activeOpacity={0.8}>
+            <Text style={styles.communeBannerText}>
+              Definissez votre commune pour voir les signalements de votre quartier en priorite.
+            </Text>
+            <Text style={styles.communeBannerLink}>Choisir ma commune ›</Text>
+          </TouchableOpacity>
+        )}
 
         {/* Filtres */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow} contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}>
@@ -288,6 +306,10 @@ const styles = StyleSheet.create({
   heroStatDot:  { width: 6, height: 6, borderRadius: 3, marginBottom: 6 },
   heroStatNum:  { fontSize: 20, fontWeight: '800', color: '#fff' },
   heroStatLabel:{ fontSize: 9, color: 'rgba(255,255,255,0.6)', marginTop: 2, fontWeight: '500' },
+
+  communeBanner:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#FFF3E0', borderRadius: 12, borderWidth: 1, borderColor: '#FFE0B2', padding: 12, marginHorizontal: 16, marginTop: 14, gap: 10 },
+  communeBannerText: { flex: 1, fontSize: 12, color: '#B26A00', fontWeight: '500', lineHeight: 17 },
+  communeBannerLink: { fontSize: 12, color: COLORS.dark, fontWeight: '700' },
 
   filterRow:    { paddingVertical: 12 },
   filterBtn:    { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: '#fff', borderWidth: 1, borderColor: '#EDECEA' },

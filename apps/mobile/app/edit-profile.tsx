@@ -165,7 +165,7 @@ export default function EditProfileScreen() {
                 </View>
               </View>
             </View>
-            <Text style={styles.fieldHint}>Pour changer de numero, allez dans Parametres → Securite.</Text>
+            <Text style={styles.fieldHint}>Le numero de telephone est lie a votre compte et ne peut pas etre modifie depuis l'application.</Text>
           </View>
 
           {/* Commune */}

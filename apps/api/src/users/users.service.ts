@@ -76,7 +76,7 @@ export class UsersService {
   async findById(id: string) {
     const user = await this.prisma.user.findUnique({
       where: { id },
-      include: { commune: true },
+      include: { commune: true, _count: { select: { reportedIncidents: true, upvotes: true } } },
     });
     if (!user) throw new NotFoundException('Utilisateur introuvable');
     const pendingCommuneChange = await this.findPendingCommuneRequest(id);
