@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native';
 import { router } from 'expo-router';
 import { apiClient, getToken, normalizeStatus } from '../../lib/api';
 
@@ -151,9 +151,7 @@ export default function HomeScreen() {
       {/* Top Bar */}
       <View style={styles.topBar}>
         <View style={styles.logo}>
-          <View style={styles.logoIcon}>
-            <Text style={styles.logoIconText}>ST</Text>
-          </View>
+          <Image source={require('../../assets/icon.png')} style={styles.logoIcon} resizeMode="contain" />
           <View>
             <Text style={styles.logoText}>Signal<Text style={{ color: COLORS.orange }}>Togo</Text></Text>
             <Text style={styles.logoSub}>Plateforme citoyenne</Text>
@@ -291,8 +289,7 @@ const styles = StyleSheet.create({
   container:    { flex: 1, backgroundColor: COLORS.bg },
   topBar:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, paddingTop: 52, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#EDECEA' },
   logo:         { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  logoIcon:     { width: 34, height: 34, borderRadius: 10, backgroundColor: COLORS.dark, alignItems: 'center', justifyContent: 'center' },
-  logoIconText: { fontSize: 13, fontWeight: '800', color: '#fff', letterSpacing: -0.5 },
+  logoIcon:     { width: 34, height: 34, borderRadius: 10 },
   logoText:     { fontSize: 16, fontWeight: '800', color: '#1A1A1A' },
   logoSub:      { fontSize: 10, color: '#B0ADA8', fontWeight: '500' },
 

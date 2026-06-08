@@ -12,7 +12,9 @@ export const apiClient = (token?: string | null) =>
   axios.create({
     baseURL: API_BASE,
     headers: token ? { Authorization: `Bearer ${token}` } : {},
-    timeout: 10000,
+    // Le serveur (Render, plan gratuit) peut se rendormir et mettre 30-60s a redemarrer :
+    // un timeout court declenchait de faux "impossible de charger" au premier appel
+    timeout: 45000,
   });
 
 // Normalise le statut API (SIGNALE → signale)
