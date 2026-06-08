@@ -1,13 +1,26 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import * as sharp from 'sharp';
 import { randomUUID as uuid } from 'node:crypto';
+import { PrismaService } from '../common/prisma/prisma.service';
 import { CloudinaryService } from './cloudinary.service';
 
 @Injectable()
 export class UploadsService {
-  constructor(private cloudinary: CloudinaryService) {}
+  constructor(
+    private prisma: PrismaService,
+    private cloudinary: CloudinaryService,
+  ) {}
 
-  async uploadPhoto(file: Express.Multer.File): Promise<{ id: string; url: string; thumbnailUrl: string }> {
+  async uploadPhoto(userId: string, incidentId: string, file: Express.Multer.File) {
+    const incident = await this.prisma.incident.findUnique({
+      where: { id: incidentId },
+      select: { id: true, reporterId: true },
+    });
+    if (!incident) throw new NotFoundException('Incident introuvable');
+    if (incident.reporterId !== userId) {
+      throw new ForbiddenException('Vous ne pouvez ajouter des photos qu\'à vos propres signalements');
+    }
+
     const id = uuid();
 
     // Compression + conversion WebP
@@ -21,6 +34,10 @@ export class UploadsService {
       this.cloudinary.upload(thumbnail, `thumbs/${id}`),
     ]);
 
-    return { id, url, thumbnailUrl };
+    const order = await this.prisma.incidentPhoto.count({ where: { incidentId } });
+
+    return this.prisma.incidentPhoto.create({
+      data: { id, incidentId, url, thumbnailUrl, order },
+    });
   }
 }

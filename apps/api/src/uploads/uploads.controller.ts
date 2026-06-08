@@ -1,10 +1,11 @@
-import { Controller, Post, UseInterceptors, UploadedFile, UseGuards, ParseFilePipeBuilder, HttpStatus } from '@nestjs/common';
+import { Body, Controller, Post, UseInterceptors, UploadedFile, UseGuards, ParseFilePipeBuilder, HttpStatus, BadRequestException } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { UploadsService } from './uploads.service';
 
 @ApiTags('Uploads')
@@ -19,6 +20,8 @@ export class UploadsController {
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024 } }))
   uploadPhoto(
+    @CurrentUser('id') userId: string,
+    @Body('incidentId') incidentId: string,
     @UploadedFile(
       new ParseFilePipeBuilder()
         .addFileTypeValidator({ fileType: /^image\/(jpe?g|png|webp|heic|heif)$/ })
@@ -27,6 +30,7 @@ export class UploadsController {
     )
     file: Express.Multer.File,
   ) {
-    return this.uploads.uploadPhoto(file);
+    if (!incidentId) throw new BadRequestException('incidentId requis');
+    return this.uploads.uploadPhoto(userId, incidentId, file);
   }
 }
