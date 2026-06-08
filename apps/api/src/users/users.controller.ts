@@ -54,9 +54,18 @@ export class UsersController {
   @Roles(Role.ADMIN)
   updateAgent(
     @Param('id') id: string,
-    @Body() body: { name?: string; role?: Role; service?: string },
+    @Body() body: { name?: string; phone?: string; role?: Role; service?: string; communeId?: string; isActive?: boolean },
   ) {
     return this.users.updateAgent(id, body);
+  }
+
+  @Post('agents/:id/reassign')
+  @Roles(Role.ADMIN)
+  reassignIncidents(
+    @Param('id') id: string,
+    @Body() body: { toAgentId: string },
+  ) {
+    return this.users.reassignIncidents(id, body.toAgentId);
   }
 
   @Delete('agents/:id')
@@ -64,6 +73,24 @@ export class UsersController {
   @HttpCode(HttpStatus.NO_CONTENT)
   removeAgent(@Param('id') id: string) {
     return this.users.removeAgent(id);
+  }
+
+  // ─── Demandes de changement de commune (AGENT+) ──────────────────────────
+
+  @Get('commune-requests')
+  @Roles(Role.AGENT)
+  getCommuneRequests(@CurrentUser('communeId') communeId: string) {
+    return this.users.findCommuneRequests(communeId);
+  }
+
+  @Patch('commune-requests/:id')
+  @Roles(Role.AGENT)
+  reviewCommuneRequest(
+    @Param('id') id: string,
+    @CurrentUser() reviewer: { id: string; communeId: string },
+    @Body() body: { action: 'APPROVE' | 'REJECT'; note?: string },
+  ) {
+    return this.users.reviewCommuneRequest(id, reviewer, body.action, body.note);
   }
 
   @Get(':id')

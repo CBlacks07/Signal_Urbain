@@ -82,6 +82,7 @@ function mapIncident(raw: any) {
     upvotes:  raw.upvotesCount ?? 0,
     comments: raw.commentsCount ?? 0,
     service:  raw.service ?? null,
+    assignedTo: raw.assignedTo ?? null,
     agent:    raw.assignedAgent
       ? { name: raw.assignedAgent.name, role: raw.assignedAgent.role }
       : null,
@@ -255,14 +256,13 @@ const SA_NAV_ITEMS = [
   { id: "sa-utilisateurs", Icon: Users,     label: "Utilisateurs" },
 ];
 
-function Sidebar({ active, onNav, collapsed, onToggle, onLogout, isSuperAdmin, isAgent, me }: any) {
+function Sidebar({ active, onNav, collapsed, onToggle, onLogout, isSuperAdmin, me }: any) {
   const [confirmLogout, setConfirmLogout] = useState(false);
   const initials = me?.name?.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase() ?? "??";
   const displayName = me?.name ?? "Chargement...";
   const displayRole = me?.role === "SUPER_ADMIN" ? "Super Admin" : me?.role === "ADMIN" ? "Administrateur" : me?.role === "AGENT" ? "Agent" : "Mairie";
 
-  // Les agents ne voient pas la gestion des équipes
-  const visibleNavItems = NAV_ITEMS.filter(item => !(isAgent && item.id === "equipes"));
+  const visibleNavItems = NAV_ITEMS;
 
   return (
     <div style={{
@@ -947,9 +947,9 @@ function DetailPanel({ report, agents, onClose, onUpdateStatus, token, onRefresh
 
 const SERVICES = ["Voirie", "Électricité", "Hydraulique", "Environnement", "Éclairage public", "Autre"];
 
-function EquipesView({ token, agents, onRefresh }: any) {
+function EquipesView({ token, agents, reports, onOpenDetail, onRefresh, isAdmin }: any) {
   const isNarrow = useMediaQuery(700);
-  const [tab, setTab]             = useState<"agents" | "citoyens">("agents");
+  const [tab, setTab]             = useState<"agents" | "citoyens" | "demandes">(isAdmin ? "agents" : "demandes");
   const [showForm, setShowForm]   = useState(false);
   const [form, setForm]           = useState({ phone: "", name: "", service: "" });
   const [loading, setLoading]     = useState(false);
@@ -958,6 +958,51 @@ function EquipesView({ token, agents, onRefresh }: any) {
   const [citizensLoading, setCitizensLoading] = useState(false);
   const [promoting, setPromoting] = useState<string | null>(null);
   const [search, setSearch]       = useState("");
+  const [communes, setCommunes]   = useState<any[]>([]);
+  const [editing, setEditing]     = useState<any>(null);
+  const [editForm, setEditForm]   = useState<any>(null);
+  const [editError, setEditError] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
+  const [incidentsOf, setIncidentsOf] = useState<any>(null);
+  const [reassign, setReassign]   = useState<{ agent: any; incidents: any[]; toAgentId: string } | null>(null);
+  const [reassigning, setReassigning] = useState(false);
+  const [requests, setRequests]   = useState<any[]>([]);
+  const [requestsLoading, setRequestsLoading] = useState(false);
+  const [reviewing, setReviewing] = useState<string | null>(null);
+  const [rejectingReq, setRejectingReq] = useState<any>(null);
+  const [rejectNote, setRejectNote] = useState("");
+
+  useEffect(() => {
+    apiClient(token).get("/communes").then(({ data }) => setCommunes(data ?? [])).catch(() => {});
+  }, [token]);
+
+  const loadRequests = useCallback(async () => {
+    setRequestsLoading(true);
+    try {
+      const { data } = await apiClient(token).get("/users/commune-requests");
+      setRequests(data ?? []);
+    } catch {
+      showError("Impossible de charger les demandes de changement de commune");
+    } finally {
+      setRequestsLoading(false);
+    }
+  }, [token]);
+
+  useEffect(() => { if (tab === "demandes") loadRequests(); }, [tab, loadRequests]);
+
+  const reviewRequest = async (id: string, action: "APPROVE" | "REJECT", note?: string) => {
+    setReviewing(id);
+    try {
+      await apiClient(token).patch(`/users/commune-requests/${id}`, { action, note });
+      setRequests(prev => prev.filter(r => r.id !== id));
+      setRejectingReq(null);
+      setRejectNote("");
+    } catch {
+      showError("Impossible de traiter cette demande");
+    } finally {
+      setReviewing(null);
+    }
+  };
 
   const loadCitizens = useCallback(async () => {
     setCitizensLoading(true);
@@ -1000,6 +1045,44 @@ function EquipesView({ token, agents, onRefresh }: any) {
     }
   };
 
+  const openEdit = (agent: any) => {
+    setEditing(agent);
+    setEditForm({ name: agent.name ?? "", phone: agent.phone ?? "", service: agent.service ?? "", communeId: agent.communeId ?? "", isActive: agent.isActive !== false });
+    setEditError("");
+  };
+
+  const saveEdit = async () => {
+    if (!editing) return;
+    if (!editForm.name || !editForm.phone) { setEditError("Nom et téléphone requis"); return; }
+    setEditSaving(true); setEditError("");
+    try {
+      await apiClient(token).patch(`/users/agents/${editing.id}`, {
+        name: editForm.name, phone: editForm.phone, service: editForm.service || undefined,
+        communeId: editForm.communeId || undefined, isActive: editForm.isActive,
+      });
+      setEditing(null);
+      onRefresh();
+    } catch (e: any) {
+      setEditError(e?.response?.data?.message ?? "Impossible de modifier cet agent");
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const openIncidentsOf = (agent: any) => setIncidentsOf(agent);
+
+  const agentOpenIncidents = (id: string) =>
+    (reports ?? []).filter((r: any) => r.assignedTo === id && r.status !== "resolu" && r.status !== "rejete");
+
+  const askRemoveAgent = (agent: any) => {
+    const open = agentOpenIncidents(agent.id);
+    if (open.length > 0) {
+      setReassign({ agent, incidents: open, toAgentId: "" });
+      return;
+    }
+    removeAgent(agent.id, agent.name);
+  };
+
   const removeAgent = async (id: string, name: string) => {
     if (!confirm(`Supprimer l'agent ${name} ?`)) return;
     try {
@@ -1007,6 +1090,21 @@ function EquipesView({ token, agents, onRefresh }: any) {
       onRefresh();
     } catch {
       showError(`Impossible de supprimer l'agent ${name}`);
+    }
+  };
+
+  const confirmReassignAndRemove = async () => {
+    if (!reassign || !reassign.toAgentId) return;
+    setReassigning(true);
+    try {
+      await apiClient(token).post(`/users/agents/${reassign.agent.id}/reassign`, { toAgentId: reassign.toAgentId });
+      await apiClient(token).delete(`/users/agents/${reassign.agent.id}`);
+      setReassign(null);
+      onRefresh();
+    } catch {
+      showError(`Impossible de réassigner et de supprimer ${reassign.agent.name}`);
+    } finally {
+      setReassigning(false);
     }
   };
 
@@ -1020,7 +1118,9 @@ function EquipesView({ token, agents, onRefresh }: any) {
         <div>
           <h1 style={{ fontSize: 26, fontWeight: 800, color: "#1a1a1a", margin: "0 0 4px", fontFamily: "'Outfit', sans-serif" }}>Équipes</h1>
           <p style={{ fontSize: 13, color: "#999", margin: 0 }}>
-            {tab === "agents" ? `${agents.length} agent${agents.length !== 1 ? "s" : ""}` : `${citizens.length} citoyen${citizens.length !== 1 ? "s" : ""}`}
+            {tab === "agents" ? `${agents.length} agent${agents.length !== 1 ? "s" : ""}`
+              : tab === "citoyens" ? `${citizens.length} citoyen${citizens.length !== 1 ? "s" : ""}`
+              : `${requests.length} demande${requests.length !== 1 ? "s" : ""} en attente`}
           </p>
         </div>
         {tab === "agents" && (
@@ -1032,13 +1132,23 @@ function EquipesView({ token, agents, onRefresh }: any) {
 
       {/* Onglets */}
       <div style={{ display: "flex", gap: 4, background: "#f0ede8", borderRadius: 12, padding: 4, marginBottom: 24, width: "fit-content" }}>
-        {([["agents", "Agents & Admins"], ["citoyens", "Citoyens"]] as const).map(([key, label]) => (
-          <button key={key} onClick={() => { setTab(key); setShowForm(false); setSearch(""); }}
-            style={{ padding: "8px 20px", borderRadius: 10, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 700, transition: "all 0.2s",
+        {([
+          ...(isAdmin ? ([["agents", "Agents & Admins"], ["citoyens", "Citoyens"]] as const) : []),
+          ["demandes", "Demandes"],
+        ] as const).map(([key, label]) => (
+          <button key={key} onClick={() => { setTab(key as any); setShowForm(false); setSearch(""); }}
+            style={{ padding: "8px 20px", borderRadius: 10, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 700, transition: "all 0.2s", display: "flex", alignItems: "center", gap: 6,
               background: tab === key ? "#fff" : "transparent",
               color: tab === key ? "#1A472A" : "#999",
               boxShadow: tab === key ? "0 1px 4px rgba(0,0,0,0.08)" : "none",
-            }}>{label}</button>
+            }}>
+            {label}
+            {key === "demandes" && requests.length > 0 && (
+              <span style={{ minWidth: 18, height: 18, borderRadius: 9, background: "#C62828", color: "#fff", fontSize: 10, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 5px" }}>
+                {requests.length}
+              </span>
+            )}
+          </button>
         ))}
       </div>
 
@@ -1091,17 +1201,25 @@ function EquipesView({ token, agents, onRefresh }: any) {
             {agents.map((agent: any) => {
               const initials = agent.name.split(" ").map((w: string) => w[0]).slice(0, 2).join("").toUpperCase();
               const isAdmin  = agent.role === "ADMIN";
+              const inactive = agent.isActive === false;
               return (
-                <div key={agent.id} style={{ background: "#fff", borderRadius: 16, border: "1px solid #ede9e3", padding: 20, animation: "cardIn 0.4s ease" }}>
+                <div key={agent.id} style={{ background: "#fff", borderRadius: 16, border: "1px solid #ede9e3", padding: 20, animation: "cardIn 0.4s ease", opacity: inactive ? 0.6 : 1 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
                     <Avatar initials={initials} size={44} color={isAdmin ? "#1A472A" : "#2B7A9B"} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{agent.name}</div>
                       <div style={{ fontSize: 11, color: "#999" }}>{agent.phone}</div>
                     </div>
-                    <span style={{ padding: "3px 10px", borderRadius: 20, fontSize: 10, fontWeight: 700, color: isAdmin ? "#1A472A" : "#2B7A9B", background: isAdmin ? "#E8F5E9" : "#E3F2FD" }}>
-                      {isAdmin ? "Admin" : "Agent"}
-                    </span>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+                      <span style={{ padding: "3px 10px", borderRadius: 20, fontSize: 10, fontWeight: 700, color: isAdmin ? "#1A472A" : "#2B7A9B", background: isAdmin ? "#E8F5E9" : "#E3F2FD" }}>
+                        {isAdmin ? "Admin" : "Agent"}
+                      </span>
+                      {inactive && (
+                        <span style={{ padding: "3px 10px", borderRadius: 20, fontSize: 10, fontWeight: 700, color: "#C62828", background: "#FFEBEE" }}>
+                          Inactif
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   {agent.service && (
@@ -1110,7 +1228,7 @@ function EquipesView({ token, agents, onRefresh }: any) {
                     </div>
                   )}
 
-                  <div style={{ display: "grid", gridTemplateColumns: isNarrow ? "1fr" : "1fr 1fr", gap: 8, marginBottom: 16 }}>
+                  <div onClick={() => openIncidentsOf(agent)} style={{ display: "grid", gridTemplateColumns: isNarrow ? "1fr" : "1fr 1fr", gap: 8, marginBottom: 16, cursor: "pointer" }}>
                     {[
                       { label: "Assignés",  value: agent._count?.assignedIncidents ?? 0, color: "#1565C0" },
                       { label: "Résolus",   value: agent.resolvedCount ?? 0,             color: "#2E7D32" },
@@ -1122,12 +1240,18 @@ function EquipesView({ token, agents, onRefresh }: any) {
                     ))}
                   </div>
 
-                  {!isAdmin && (
-                    <button onClick={() => removeAgent(agent.id, agent.name)}
-                      style={{ width: "100%", padding: "8px", background: "#FFEBEE", color: "#C62828", border: "none", borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
-                      Retirer de l'équipe
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={() => openEdit(agent)}
+                      style={{ flex: 1, padding: "8px", background: "#f5f2ed", color: "#666", border: "none", borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                      Modifier
                     </button>
-                  )}
+                    {!isAdmin && (
+                      <button onClick={() => askRemoveAgent(agent)}
+                        style={{ flex: 1, padding: "8px", background: "#FFEBEE", color: "#C62828", border: "none", borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                        Retirer de l'équipe
+                      </button>
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -1218,6 +1342,177 @@ function EquipesView({ token, agents, onRefresh }: any) {
             </div>
           )}
         </div>
+      )}
+
+      {/* ── Vue Demandes de changement de commune ───────────────────────── */}
+      {tab === "demandes" && (
+        requestsLoading ? (
+          <div style={{ padding: 48, textAlign: "center", color: "#bbb", fontSize: 13 }}>Chargement…</div>
+        ) : requests.length === 0 ? (
+          <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #ede9e3", padding: 48, textAlign: "center", color: "#bbb", fontSize: 13 }}>
+            Aucune demande de changement de commune en attente.
+          </div>
+        ) : (
+          <div style={{ display: "grid", gap: 12 }}>
+            {requests.map((r: any) => {
+              const initials = (r.user?.name ?? "?").split(" ").map((w: string) => w[0]).slice(0, 2).join("").toUpperCase();
+              return (
+                <div key={r.id} style={{ background: "#fff", borderRadius: 16, border: "1px solid #ede9e3", padding: 20, animation: "cardIn 0.3s ease" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+                    <Avatar initials={initials} size={40} color="#B0896A" />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>{r.user?.name ?? "—"}</div>
+                      <div style={{ fontSize: 11, color: "#999" }}>{r.user?.phone}</div>
+                    </div>
+                    <div style={{ fontSize: 12, color: "#666", display: "flex", alignItems: "center", gap: 6, fontWeight: 600 }}>
+                      <span>{r.fromCommune?.name ?? "—"}</span>
+                      <ChevronRight size={13} color="#bbb" />
+                      <span style={{ color: "#1A472A" }}>{r.toCommune?.name}</span>
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 11, color: "#bbb", marginBottom: 14 }}>
+                    Demandé le {new Date(r.createdAt).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}
+                  </div>
+                  <div style={{ display: "flex", gap: 10 }}>
+                    <button onClick={() => reviewRequest(r.id, "APPROVE")} disabled={reviewing === r.id}
+                      style={{ flex: 1, padding: "9px", background: "#E8F5E9", color: "#1A472A", border: "none", borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: "pointer", opacity: reviewing === r.id ? 0.6 : 1 }}>
+                      {reviewing === r.id ? "Traitement..." : "Approuver"}
+                    </button>
+                    <button onClick={() => { setRejectingReq(r); setRejectNote(""); }} disabled={reviewing === r.id}
+                      style={{ flex: 1, padding: "9px", background: "#FFEBEE", color: "#C62828", border: "none", borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: "pointer", opacity: reviewing === r.id ? 0.6 : 1 }}>
+                      Rejeter
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )
+      )}
+
+      {rejectingReq && (
+        <Modal title={`Rejeter la demande de ${rejectingReq.user?.name ?? "ce citoyen"}`} onClose={() => setRejectingReq(null)}>
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ fontSize: 10.5, fontWeight: 700, color: "#999", textTransform: "uppercase", display: "block", marginBottom: 4 }}>Motif (optionnel)</label>
+            <textarea value={rejectNote} onChange={e => setRejectNote(e.target.value)} rows={3}
+              placeholder="Expliquez pourquoi cette demande est refusée…"
+              style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1.5px solid #e8e5e0", fontSize: 13, fontFamily: "inherit", outline: "none", background: "#fdfcfa", resize: "vertical", boxSizing: "border-box" }} />
+          </div>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button onClick={() => reviewRequest(rejectingReq.id, "REJECT", rejectNote.trim() || undefined)} disabled={reviewing === rejectingReq.id}
+              style={{ padding: "10px 24px", background: "#C62828", color: "#fff", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: "pointer", opacity: reviewing === rejectingReq.id ? 0.7 : 1 }}>
+              {reviewing === rejectingReq.id ? "Traitement..." : "Confirmer le rejet"}
+            </button>
+            <button onClick={() => setRejectingReq(null)} disabled={reviewing === rejectingReq.id}
+              style={{ padding: "10px 16px", background: "#f5f2ed", color: "#666", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+              Annuler
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {editing && editForm && (
+        <Modal title={`Modifier ${editing.name}`} onClose={() => setEditing(null)}>
+          <div style={{ display: "grid", gap: 12, marginBottom: 16 }}>
+            <div>
+              <label style={{ fontSize: 10.5, fontWeight: 700, color: "#999", textTransform: "uppercase", display: "block", marginBottom: 4 }}>Nom complet</label>
+              <input value={editForm.name} onChange={e => setEditForm((v: any) => ({ ...v, name: e.target.value }))}
+                style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1.5px solid #e8e5e0", fontSize: 13, fontFamily: "inherit", outline: "none", background: "#fdfcfa", boxSizing: "border-box" }} />
+            </div>
+            <div>
+              <label style={{ fontSize: 10.5, fontWeight: 700, color: "#999", textTransform: "uppercase", display: "block", marginBottom: 4 }}>Téléphone</label>
+              <input value={editForm.phone} onChange={e => setEditForm((v: any) => ({ ...v, phone: e.target.value }))}
+                style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1.5px solid #e8e5e0", fontSize: 13, fontFamily: "inherit", outline: "none", background: "#fdfcfa", boxSizing: "border-box" }} />
+            </div>
+            <div>
+              <label style={{ fontSize: 10.5, fontWeight: 700, color: "#999", textTransform: "uppercase", display: "block", marginBottom: 4 }}>Service</label>
+              <select value={editForm.service} onChange={e => setEditForm((v: any) => ({ ...v, service: e.target.value }))}
+                style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1.5px solid #e8e5e0", fontSize: 13, fontFamily: "inherit", outline: "none", background: "#fdfcfa", cursor: "pointer", boxSizing: "border-box" }}>
+                <option value="">— Choisir —</option>
+                {SERVICES.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={{ fontSize: 10.5, fontWeight: 700, color: "#999", textTransform: "uppercase", display: "block", marginBottom: 4 }}>Commune</label>
+              <select value={editForm.communeId} onChange={e => setEditForm((v: any) => ({ ...v, communeId: e.target.value }))}
+                style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1.5px solid #e8e5e0", fontSize: 13, fontFamily: "inherit", outline: "none", background: "#fdfcfa", cursor: "pointer", boxSizing: "border-box" }}>
+                <option value="">— Choisir —</option>
+                {communes.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 12.5, color: "#666", fontWeight: 600 }}>
+              <input type="checkbox" checked={editForm.isActive} onChange={e => setEditForm((v: any) => ({ ...v, isActive: e.target.checked }))} />
+              Compte actif
+            </label>
+          </div>
+          {editError && <div style={{ fontSize: 12, color: "#C62828", marginBottom: 12 }}>{editError}</div>}
+          <div style={{ display: "flex", gap: 10 }}>
+            <button onClick={saveEdit} disabled={editSaving}
+              style={{ padding: "10px 24px", background: "#1A472A", color: "#fff", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: "pointer", opacity: editSaving ? 0.7 : 1 }}>
+              {editSaving ? "Enregistrement..." : "Enregistrer"}
+            </button>
+            <button onClick={() => setEditing(null)}
+              style={{ padding: "10px 16px", background: "#f5f2ed", color: "#666", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+              Annuler
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {incidentsOf && (
+        <Modal title={`Incidents — ${incidentsOf.name}`} onClose={() => setIncidentsOf(null)}>
+          {(() => {
+            const list = (reports ?? []).filter((r: any) => r.assignedTo === incidentsOf.id);
+            if (list.length === 0) return <div style={{ padding: 24, textAlign: "center", color: "#bbb", fontSize: 13 }}>Aucun incident assigné à cet agent.</div>;
+            return (
+              <div style={{ maxHeight: 420, overflowY: "auto", display: "grid", gap: 8 }}>
+                {list.map((r: any) => {
+                  const st = STATUS[r.status];
+                  return (
+                    <div key={r.id} onClick={() => { setIncidentsOf(null); onOpenDetail?.(r); }}
+                      style={{ padding: "12px 14px", borderRadius: 12, border: "1px solid #ede9e3", cursor: "pointer" }}
+                      onMouseEnter={e => (e.currentTarget.style.background = "#fdfcfa")}
+                      onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                        <span style={{ fontSize: 12.5, fontWeight: 700, color: "#333" }}>{r.id}</span>
+                        <Pill color={st?.color ?? "#999"} bg={st?.bg ?? "#eee"} small>{st?.label ?? r.status}</Pill>
+                      </div>
+                      <p style={{ fontSize: 12, color: "#666", margin: "0 0 4px", lineHeight: 1.4, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" } as any}>{r.desc}</p>
+                      <span style={{ fontSize: 11, color: "#aaa", display: "flex", alignItems: "center", gap: 3 }}><MapPin size={10} /> {r.commune}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
+        </Modal>
+      )}
+
+      {reassign && (
+        <Modal title={`Réassigner avant suppression`} onClose={() => !reassigning && setReassign(null)}>
+          <p style={{ fontSize: 13, color: "#666", lineHeight: 1.5, marginBottom: 16 }}>
+            <strong>{reassign.agent.name}</strong> a {reassign.incidents.length} incident{reassign.incidents.length !== 1 ? "s" : ""} en cours.
+            Choisissez un autre agent à qui les réassigner avant de le retirer de l'équipe.
+          </p>
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ fontSize: 10.5, fontWeight: 700, color: "#999", textTransform: "uppercase", display: "block", marginBottom: 4 }}>Réassigner à</label>
+            <select value={reassign.toAgentId} onChange={e => setReassign(v => v && ({ ...v, toAgentId: e.target.value }))}
+              style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1.5px solid #e8e5e0", fontSize: 13, fontFamily: "inherit", outline: "none", background: "#fdfcfa", cursor: "pointer", boxSizing: "border-box" }}>
+              <option value="">— Choisir un agent —</option>
+              {agents.filter((a: any) => a.id !== reassign.agent.id).map((a: any) => <option key={a.id} value={a.id}>{a.name}</option>)}
+            </select>
+          </div>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button onClick={confirmReassignAndRemove} disabled={reassigning || !reassign.toAgentId}
+              style={{ padding: "10px 24px", background: "#C62828", color: "#fff", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: "pointer", opacity: (reassigning || !reassign.toAgentId) ? 0.6 : 1 }}>
+              {reassigning ? "Traitement..." : "Réassigner et supprimer"}
+            </button>
+            <button onClick={() => setReassign(null)} disabled={reassigning}
+              style={{ padding: "10px 16px", background: "#f5f2ed", color: "#666", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+              Annuler
+            </button>
+          </div>
+        </Modal>
       )}
     </div>
   );
@@ -1673,6 +1968,7 @@ const ROLE_LABELS: Record<string, { label: string; color: string; bg: string }> 
 
 function UsersAdminView({ token }: any) {
   const [users, setUsers]       = useState<any[]>([]);
+  const [communes, setCommunes] = useState<any[]>([]);
   const [loading, setLoading]   = useState(true);
   const [roleFilter, setRoleFilter] = useState("all");
   const [err, setErr]           = useState("");
@@ -1688,10 +1984,18 @@ function UsersAdminView({ token }: any) {
   };
 
   useEffect(() => { load(); }, [roleFilter]);
+  useEffect(() => {
+    apiClient(token).get("/admin/communes").then(({ data }) => setCommunes(data ?? [])).catch(() => {});
+  }, [token]);
 
   const changeRole = async (id: string, newRole: string) => {
     try { await apiClient(token).patch(`/admin/users/${id}/role`, { role: newRole }); load(); }
     catch { setErr("Impossible de changer le rôle"); }
+  };
+
+  const changeCommune = async (id: string, communeId: string) => {
+    try { await apiClient(token).patch(`/admin/users/${id}/commune`, { communeId: communeId || null }); load(); }
+    catch { setErr("Impossible de changer la commune"); }
   };
 
   const remove = async (id: string, name: string) => {
@@ -1737,6 +2041,11 @@ function UsersAdminView({ token }: any) {
                 <span style={{ padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700, color: rl.color, background: rl.bg }}>
                   {rl.label}
                 </span>
+                <select value={u.communeId ?? ""} onChange={e => changeCommune(u.id, e.target.value)}
+                  style={{ padding: "5px 8px", border: "1.5px solid #e8e5e0", borderRadius: 8, fontSize: 12, cursor: "pointer", maxWidth: 150 }}>
+                  <option value="">— Sans commune —</option>
+                  {communes.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
                 <select value={u.role} onChange={e => changeRole(u.id, e.target.value)}
                   style={{ padding: "5px 8px", border: "1.5px solid #e8e5e0", borderRadius: 8, fontSize: 12, cursor: "pointer" }}>
                   {Object.keys(ROLE_LABELS).map(r => <option key={r} value={r}>{ROLE_LABELS[r].label}</option>)}
@@ -1842,7 +2151,7 @@ export default function MairieDashboard() {
         * { box-sizing: border-box; }
       `}</style>
 
-      <Sidebar active={page} onNav={setPage} collapsed={collapsed} onToggle={() => setCollapsed(c => !c)} onLogout={handleLogout} isSuperAdmin={isSuperAdmin} isAgent={isAgent} me={me} />
+      <Sidebar active={page} onNav={setPage} collapsed={collapsed} onToggle={() => setCollapsed(c => !c)} onLogout={handleLogout} isSuperAdmin={isSuperAdmin} me={me} />
 
       <div style={{ flex: 1, padding: "28px 32px", overflowY: "auto", maxHeight: "100vh" }}>
         {token && <TopBar token={token} me={me} />}
@@ -1853,9 +2162,9 @@ export default function MairieDashboard() {
             {page === "dashboard"  && <DashboardView reports={reports} onOpenDetail={setDetailReport} />}
             {page === "incidents"  && <IncidentsView reports={reports} onOpenDetail={setDetailReport} />}
             {page === "stats"      && <StatsView reports={reports} />}
-            {page === "equipes"    && (isAdmin
-              ? <EquipesView token={token} agents={agents} onRefresh={() => fetchAgents(token!)} />
-              : <div style={{ padding: 48, textAlign: "center", color: "#bbb", fontSize: 14 }}>Accès réservé aux administrateurs.</div>
+            {page === "equipes"    && ((isAdmin || isAgent)
+              ? <EquipesView token={token} agents={agents} reports={reports} onOpenDetail={setDetailReport} onRefresh={() => fetchAgents(token!)} isAdmin={isAdmin} />
+              : <div style={{ padding: 48, textAlign: "center", color: "#bbb", fontSize: 14 }}>Accès réservé aux administrateurs et agents.</div>
             )}
             {page === "carte"      && <CarteView reports={reports} onOpenDetail={setDetailReport} />}
             {page === "parametres"       && <ParametresView token={token} onLogout={handleLogout} />}

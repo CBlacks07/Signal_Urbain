@@ -59,6 +59,11 @@ export class AdminController {
     return this.admin.updateUserRole(id, body.role);
   }
 
+  @Patch('users/:id/commune')
+  updateCommuneOfUser(@Param('id') id: string, @Body() body: { communeId: string | null }) {
+    return this.admin.updateUserCommune(id, body.communeId);
+  }
+
   @Delete('users/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
   deleteUser(@Param('id') id: string) {

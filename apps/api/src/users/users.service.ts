@@ -1,10 +1,14 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
-import { Role } from '@prisma/client';
+import { Injectable, NotFoundException, ConflictException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { Role, NotificationType } from '@prisma/client';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notifications: NotificationsService,
+  ) {}
 
   async create(data: { phone: string; name: string; communeId?: string }) {
     return this.prisma.user.create({ data });
@@ -54,12 +58,19 @@ export class UsersService {
     });
   }
 
-  async updateAgent(id: string, data: { name?: string; role?: Role; service?: string }) {
+  async updateAgent(id: string, data: { name?: string; phone?: string; role?: Role; service?: string; communeId?: string; isActive?: boolean }) {
     return this.prisma.user.update({ where: { id }, data });
   }
 
   async removeAgent(id: string) {
     return this.prisma.user.delete({ where: { id } });
+  }
+
+  async reassignIncidents(fromId: string, toId: string) {
+    return this.prisma.incident.updateMany({
+      where: { assignedTo: fromId, status: { notIn: ['RESOLU', 'REJETE'] } },
+      data: { assignedTo: toId },
+    });
   }
 
   async findById(id: string) {
@@ -68,14 +79,105 @@ export class UsersService {
       include: { commune: true },
     });
     if (!user) throw new NotFoundException('Utilisateur introuvable');
-    return user;
+    const pendingCommuneChange = await this.findPendingCommuneRequest(id);
+    return { ...user, pendingCommuneChange };
   }
 
   async findMe(id: string) {
     return this.findById(id);
   }
 
+  async findPendingCommuneRequest(userId: string) {
+    const request = await this.prisma.communeChangeRequest.findFirst({
+      where: { userId, status: 'PENDING' },
+      include: { toCommune: true },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!request) return null;
+    return { id: request.id, toCommuneId: request.toCommuneId, toCommuneName: request.toCommune.name, createdAt: request.createdAt };
+  }
+
   async update(id: string, data: { name?: string; email?: string; communeId?: string; avatarUrl?: string; fcmToken?: string }) {
-    return this.prisma.user.update({ where: { id }, data });
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) throw new NotFoundException('Utilisateur introuvable');
+
+    const { communeId, ...rest } = data;
+    const wantsCommuneChange = communeId !== undefined && communeId !== null && communeId !== user.communeId;
+
+    if (wantsCommuneChange && user.role === Role.CITIZEN && user.communeId !== null) {
+      await this.prisma.communeChangeRequest.updateMany({
+        where: { userId: id, status: 'PENDING' },
+        data: { status: 'REJECTED', reviewNote: 'Remplacée par une nouvelle demande' },
+      });
+      const toCommune = await this.prisma.commune.findUnique({ where: { id: communeId! } });
+      if (!toCommune) throw new NotFoundException('Commune introuvable');
+      await this.prisma.communeChangeRequest.create({
+        data: { userId: id, fromCommuneId: user.communeId, toCommuneId: communeId!, status: 'PENDING' },
+      });
+
+      const reviewers = await this.prisma.user.findMany({
+        where: { communeId: communeId!, role: { in: [Role.AGENT, Role.ADMIN] } },
+        select: { id: true },
+      });
+      await Promise.all(reviewers.map((r) =>
+        this.notifications.sendPush(
+          r.id,
+          'Demande de changement de commune',
+          `${user.name} souhaite rejoindre ${toCommune.name} et attend votre validation.`,
+          { type: NotificationType.SYSTEM },
+        ),
+      ));
+
+      const updated = await this.prisma.user.update({ where: { id }, data: rest, include: { commune: true } });
+      return { ...updated, pendingCommuneChange: { toCommuneId: communeId!, toCommuneName: toCommune.name } };
+    }
+
+    const updated = await this.prisma.user.update({ where: { id }, data, include: { commune: true } });
+    const pendingCommuneChange = await this.findPendingCommuneRequest(id);
+    return { ...updated, pendingCommuneChange };
+  }
+
+  async findCommuneRequests(communeId: string) {
+    return this.prisma.communeChangeRequest.findMany({
+      where: { toCommuneId: communeId, status: 'PENDING' },
+      include: { user: { select: { id: true, name: true, phone: true } }, fromCommune: true, toCommune: true },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  async reviewCommuneRequest(id: string, reviewer: { id: string; communeId: string }, action: 'APPROVE' | 'REJECT', note?: string) {
+    const request = await this.prisma.communeChangeRequest.findUnique({ where: { id }, include: { toCommune: true, user: true } });
+    if (!request) throw new NotFoundException('Demande introuvable');
+    if (request.status !== 'PENDING') throw new BadRequestException('Cette demande a déjà été traitée');
+    if (request.toCommuneId !== reviewer.communeId) throw new ForbiddenException('Vous ne pouvez traiter que les demandes de votre commune');
+
+    if (action === 'APPROVE') {
+      await this.prisma.$transaction([
+        this.prisma.user.update({ where: { id: request.userId }, data: { communeId: request.toCommuneId } }),
+        this.prisma.communeChangeRequest.update({
+          where: { id },
+          data: { status: 'APPROVED', reviewedBy: reviewer.id, reviewedAt: new Date(), reviewNote: note },
+        }),
+      ]);
+      await this.notifications.sendPush(
+        request.userId,
+        'Changement de commune approuvé',
+        `Votre changement de commune vers ${request.toCommune.name} a été approuvé.`,
+        { type: NotificationType.SYSTEM },
+      );
+    } else {
+      await this.prisma.communeChangeRequest.update({
+        where: { id },
+        data: { status: 'REJECTED', reviewedBy: reviewer.id, reviewedAt: new Date(), reviewNote: note },
+      });
+      await this.notifications.sendPush(
+        request.userId,
+        'Changement de commune refusé',
+        note ? `Votre demande vers ${request.toCommune.name} a été refusée : ${note}` : `Votre demande de changement vers ${request.toCommune.name} a été refusée.`,
+        { type: NotificationType.SYSTEM },
+      );
+    }
+
+    return { ok: true };
   }
 }

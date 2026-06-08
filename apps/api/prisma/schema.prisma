@@ -65,19 +65,22 @@ model User {
   communeId   String?
   avatarUrl   String?
   isVerified  Boolean  @default(false)
+  isActive    Boolean  @default(true)
   fcmToken    String?  // Firebase push token
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   // Relations
-  commune           Commune?        @relation(fields: [communeId], references: [id])
-  reportedIncidents Incident[]      @relation("Reporter")
-  assignedIncidents Incident[]      @relation("AssignedAgent")
-  upvotes           Upvote[]
-  comments          Comment[]
-  statusChanges     StatusHistory[]
-  notifications     Notification[]
-  otpCodes          OtpCode[]
+  commune                 Commune?               @relation(fields: [communeId], references: [id])
+  reportedIncidents       Incident[]             @relation("Reporter")
+  assignedIncidents       Incident[]             @relation("AssignedAgent")
+  upvotes                 Upvote[]
+  comments                Comment[]
+  statusChanges           StatusHistory[]
+  notifications           Notification[]
+  otpCodes                OtpCode[]
+  communeRequestsMade     CommuneChangeRequest[] @relation("CommuneRequestUser")
+  communeRequestsReviewed CommuneChangeRequest[] @relation("CommuneRequestReviewer")
 
   @@map("users")
 }
@@ -106,8 +109,35 @@ model Commune {
 
   users     User[]
   incidents Incident[]
+  changeRequestsFrom CommuneChangeRequest[] @relation("CommuneRequestFrom")
+  changeRequestsTo   CommuneChangeRequest[] @relation("CommuneRequestTo")
 
   @@map("communes")
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model CommuneChangeRequest {
+  id            String        @id @default(uuid())
+  userId        String
+  user          User          @relation("CommuneRequestUser", fields: [userId], references: [id], onDelete: Cascade)
+  fromCommuneId String?
+  fromCommune   Commune?      @relation("CommuneRequestFrom", fields: [fromCommuneId], references: [id])
+  toCommuneId   String
+  toCommune     Commune       @relation("CommuneRequestTo", fields: [toCommuneId], references: [id])
+  status        RequestStatus @default(PENDING)
+  reviewedBy    String?
+  reviewer      User?         @relation("CommuneRequestReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
+  reviewNote    String?
+  createdAt     DateTime      @default(now())
+  reviewedAt    DateTime?
+
+  @@index([toCommuneId, status])
+  @@map("commune_change_requests")
 }
 
 model Incident {

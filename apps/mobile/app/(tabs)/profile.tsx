@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, ScrollView } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { apiClient, getToken, clearToken } from '../../lib/api';
 
 const COLORS = { dark: '#1A472A', orange: '#D4760A', bg: '#F5F4F2' };
@@ -35,20 +35,28 @@ export default function ProfileScreen() {
   const [me, setMe] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const token = await getToken();
-        const res = await apiClient(token).get('/users/me');
-        setMe(res.data);
-      } catch {
-        await clearToken();
-        router.replace('/login');
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
+  // Recharge le profil a chaque fois que l'onglet reprend le focus,
+  // pour refleter les changements faits depuis "Modifier le profil"
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      (async () => {
+        try {
+          const token = await getToken();
+          const res = await apiClient(token).get('/users/me');
+          if (!cancelled) setMe(res.data);
+        } catch {
+          if (!cancelled) {
+            await clearToken();
+            router.replace('/login');
+          }
+        } finally {
+          if (!cancelled) setLoading(false);
+        }
+      })();
+      return () => { cancelled = true; };
+    }, [])
+  );
 
   const handleLogout = () => {
     Alert.alert(
@@ -76,11 +84,12 @@ export default function ProfileScreen() {
   const signalements = me?._count?.reportedIncidents ?? 0;
   const soutiens = me?._count?.upvotes ?? 0;
   const communeName = me?.commune?.name ?? null;
+  const pendingChange = me?.pendingCommuneChange ?? null;
 
   const MENU_ITEMS = [
     { label: 'Mes signalements', subtitle: `${signalements} signalement${signalements > 1 ? 's' : ''}`, action: () => router.push('/mes-signalements') },
     { label: 'Notifications', subtitle: 'Alertes et mises a jour', action: () => router.push('/notifications') },
-    { label: 'Ma commune', subtitle: communeName ?? 'Non definie', action: () => {} },
+    { label: 'Ma commune', subtitle: pendingChange ? `En attente de validation vers ${pendingChange.toCommuneName}` : (communeName ?? 'Non definie'), action: () => router.push('/edit-profile') },
   ];
 
   return (

@@ -141,7 +141,7 @@ export default function ReportScreen() {
   const selectedCat = CATEGORIES.find(c => c.id === category);
 
   return (
-    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity

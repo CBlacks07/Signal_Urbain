@@ -18,6 +18,7 @@ export default function EditProfileScreen() {
   const [name, setName]           = useState('');
   const [email, setEmail]         = useState('');
   const [communeId, setCommuneId] = useState('');
+  const [pendingChange, setPendingChange] = useState<{ toCommuneId: string; toCommuneName: string } | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -32,6 +33,7 @@ export default function EditProfileScreen() {
         setName(user.name ?? '');
         setEmail(user.email ?? '');
         setCommuneId(user.communeId ?? '');
+        setPendingChange(user.pendingCommuneChange ?? null);
         setCommunes(communesRes.data ?? []);
       } catch {
         Alert.alert('Erreur', 'Impossible de charger le profil.');
@@ -50,14 +52,28 @@ export default function EditProfileScreen() {
     setSaving(true);
     try {
       const token = await getToken();
-      await apiClient(token).patch('/users/me', {
+      const res = await apiClient(token).patch('/users/me', {
         name: name.trim(),
         email: email.trim() || undefined,
         communeId: communeId || undefined,
       });
-      Alert.alert('Profil mis a jour', 'Vos informations ont ete enregistrees.', [
-        { text: 'OK', onPress: () => router.back() },
-      ]);
+      const updated = res.data;
+      const pending = updated?.pendingCommuneChange ?? null;
+      setPendingChange(pending);
+      if (pending && communeId !== (me?.communeId ?? '')) {
+        // La commune n'a pas change cote serveur tant que la demande n'est pas validee
+        setCommuneId(me?.communeId ?? '');
+        Alert.alert(
+          'Demande envoyee',
+          `Votre changement de commune vers ${pending.toCommuneName} est en attente de validation par l'equipe de cette commune.`,
+          [{ text: 'OK', onPress: () => router.back() }],
+        );
+      } else {
+        setMe(updated);
+        Alert.alert('Profil mis a jour', 'Vos informations ont ete enregistrees.', [
+          { text: 'OK', onPress: () => router.back() },
+        ]);
+      }
     } catch (e: any) {
       Alert.alert('Erreur', e?.response?.data?.message ?? 'Impossible de sauvegarder.');
     } finally {
@@ -75,7 +91,7 @@ export default function EditProfileScreen() {
   const hasChanges = name !== (me?.name ?? '') || email !== (me?.email ?? '') || communeId !== (me?.communeId ?? '');
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
@@ -155,6 +171,13 @@ export default function EditProfileScreen() {
           {/* Commune */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>MA COMMUNE</Text>
+            {pendingChange && (
+              <View style={styles.pendingBanner}>
+                <Text style={styles.pendingBannerText}>
+                  Demande en attente : passage vers <Text style={{ fontWeight: '700' }}>{pendingChange.toCommuneName}</Text>
+                </Text>
+              </View>
+            )}
             <View style={styles.card}>
               <Text style={[styles.fieldLabel, { padding: 16, paddingBottom: 8 }]}>Selectionnez votre commune</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 16, gap: 8 }}>
@@ -248,6 +271,9 @@ const styles = StyleSheet.create({
   readonlyValue:      { fontSize: 14, color: '#555', fontWeight: '500' },
   readonlyBadge:      { paddingHorizontal: 8, paddingVertical: 3, backgroundColor: '#F5F4F2', borderRadius: 6 },
   readonlyBadgeText:  { fontSize: 10, color: '#B0ADA8', fontWeight: '600' },
+
+  pendingBanner:      { backgroundColor: '#FFF3E0', borderRadius: 12, borderWidth: 1, borderColor: '#FFE0B2', padding: 12, marginBottom: 8 },
+  pendingBannerText:  { fontSize: 12, color: '#B26A00', fontWeight: '500', lineHeight: 17 },
 
   communeChip:        { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: COLORS.bg, borderWidth: 1.5, borderColor: '#EDECEA' },
   communeChipActive:  { backgroundColor: COLORS.dark, borderColor: COLORS.dark },

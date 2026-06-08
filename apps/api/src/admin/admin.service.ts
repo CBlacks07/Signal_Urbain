@@ -86,6 +86,12 @@ export class AdminService {
     return this.prisma.user.update({ where: { id }, data: { role } });
   }
 
+  async updateUserCommune(id: string, communeId: string | null) {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) throw new NotFoundException('Utilisateur introuvable');
+    return this.prisma.user.update({ where: { id }, data: { communeId } });
+  }
+
   async deleteUser(id: string) {
     return this.prisma.user.delete({ where: { id } });
   }
