@@ -1,14 +1,15 @@
 import { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, Image } from 'react-native';
 import { router } from 'expo-router';
-import { apiClient, saveToken, API_BASE } from '../lib/api';
+import { apiClient, saveToken, getToken, API_BASE } from '../lib/api';
 
 const COLORS = { dark: '#1A472A', bg: '#FDFCFA' };
 
 export default function LoginScreen() {
-  const [step, setStep]           = useState<'phone' | 'otp'>('phone');
+  const [step, setStep]           = useState<'phone' | 'otp' | 'name'>('phone');
   const [phone, setPhone]         = useState('');
   const [otp, setOtp]             = useState('');
+  const [name, setName]           = useState('');
   const [loading, setLoading]     = useState(false);
   const [error, setError]         = useState('');
   const [debugCode, setDebugCode] = useState('');
@@ -33,9 +34,27 @@ export default function LoginScreen() {
     try {
       const res = await apiClient().post('/auth/verify-otp', { phone: phone.trim(), code: otp.trim() });
       await saveToken(res.data.access_token);
-      router.replace('/(tabs)');
+      if (res.data.needsProfile) {
+        setStep('name');
+      } else {
+        router.replace('/(tabs)');
+      }
     } catch (e: any) {
       setError(e?.response?.data?.message ?? 'Code incorrect ou expiré.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const submitName = async () => {
+    if (!name.trim()) { setError('Entrez votre nom complet'); return; }
+    setLoading(true); setError('');
+    try {
+      const token = await getToken();
+      await apiClient(token).patch('/users/me', { name: name.trim() });
+      router.replace('/(tabs)');
+    } catch (e: any) {
+      setError(e?.response?.data?.message ?? "Impossible d'enregistrer votre nom.");
     } finally {
       setLoading(false);
     }
@@ -51,7 +70,25 @@ export default function LoginScreen() {
 
         {/* Card */}
         <View style={styles.card}>
-          {step === 'phone' ? (
+          {step === 'name' ? (
+            <>
+              <Text style={styles.cardTitle}>Bienvenue !</Text>
+              <Text style={styles.cardSub}>Comment souhaitez-vous être identifié ?</Text>
+              <Text style={styles.label}>NOM COMPLET</Text>
+              <TextInput
+                style={styles.input}
+                value={name}
+                onChangeText={setName}
+                placeholder="Ex: Komi Agbeko"
+                autoCapitalize="words"
+                autoFocus
+              />
+              {error ? <Text style={styles.error}>{error}</Text> : null}
+              <TouchableOpacity style={styles.btn} onPress={submitName} disabled={loading}>
+                {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Continuer</Text>}
+              </TouchableOpacity>
+            </>
+          ) : step === 'phone' ? (
             <>
               <Text style={styles.cardTitle}>Connexion</Text>
               <Text style={styles.cardSub}>Entrez votre numéro togolais</Text>

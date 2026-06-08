@@ -1,15 +1,13 @@
-import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../common/prisma/prisma.service';
-import { UsersService } from '../users/users.service';
 import { OtpService } from './otp.service';
 
 @Injectable()
 export class AuthService {
   constructor(
     private prisma: PrismaService,
-    private users: UsersService,
     private jwt: JwtService,
     private otp: OtpService,
     private config: ConfigService,
@@ -37,19 +35,25 @@ export class AuthService {
       throw new UnauthorizedException('Code OTP invalide ou expiré');
     }
 
-    // Crée ou récupère l'utilisateur
-    let user = await this.prisma.user.findUnique({ where: { phone: normalizedPhone } });
+    // Le compte a été pré-créé (avec le nom temporaire "En attente") lors de la demande du code
+    const user = await this.prisma.user.findUnique({ where: { phone: normalizedPhone } });
     if (!user) {
-      if (!name) throw new BadRequestException('Nom requis pour la première connexion');
-      user = await this.users.create({ phone: normalizedPhone, name });
+      throw new UnauthorizedException('Code OTP invalide ou expiré');
     }
 
-    // Marque comme vérifié
-    if (!user.isVerified) {
-      await this.prisma.user.update({ where: { id: user.id }, data: { isVerified: true } });
+    const isFirstLogin = user.name === 'En attente';
+    const updates: { isVerified?: boolean; name?: string } = {};
+    if (!user.isVerified) updates.isVerified = true;
+    if (isFirstLogin && name?.trim()) updates.name = name.trim();
+    if (Object.keys(updates).length > 0) {
+      await this.prisma.user.update({ where: { id: user.id }, data: updates });
     }
 
-    return this.generateTokens(user.id, user.role);
+    return {
+      ...this.generateTokens(user.id, user.role),
+      // Le client doit demander le nom si le compte est encore sur le placeholder
+      needsProfile: isFirstLogin && !name?.trim(),
+    };
   }
 
   async changePhone(userId: string, newPhone: string, code: string) {
