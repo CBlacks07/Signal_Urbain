@@ -197,12 +197,12 @@ model StatusHistory {
   incidentId String
   oldStatus  IncidentStatus
   newStatus  IncidentStatus
-  changedBy  String
+  changedBy  String?
   note       String?
   createdAt  DateTime       @default(now())
 
   incident Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
-  agent    User     @relation(fields: [changedBy], references: [id])
+  agent    User?    @relation(fields: [changedBy], references: [id], onDelete: SetNull)
 
   @@index([incidentId])
   @@map("status_history")
