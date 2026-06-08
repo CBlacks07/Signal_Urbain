@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, ConflictException, ForbiddenException, BadRequestException } from '@nestjs/common';
-import { Role, NotificationType } from '@prisma/client';
+import { Role, NotificationType, Prisma } from '@prisma/client';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 
@@ -61,11 +61,25 @@ export class UsersService {
   }
 
   async updateAgent(id: string, data: { name?: string; phone?: string; role?: Role; service?: string; communeId?: string; isActive?: boolean }) {
-    return this.prisma.user.update({ where: { id }, data });
+    try {
+      return await this.prisma.user.update({ where: { id }, data });
+    } catch (e) {
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+        throw new ConflictException('Ce numéro de téléphone est déjà utilisé par un autre compte');
+      }
+      throw e;
+    }
   }
 
   async removeAgent(id: string) {
-    return this.prisma.user.delete({ where: { id } });
+    try {
+      return await this.prisma.user.delete({ where: { id } });
+    } catch (e) {
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2003') {
+        throw new ConflictException('Cet agent ne peut pas être supprimé : il a des signalements à son nom (créés en tant que citoyen avant sa promotion). Désactivez-le plutôt via "Modifier".');
+      }
+      throw e;
+    }
   }
 
   async reassignIncidents(fromId: string, toId: string) {

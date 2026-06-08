@@ -1089,8 +1089,8 @@ function EquipesView({ token, agents, reports, onOpenDetail, onRefresh, isAdmin,
     try {
       await apiClient(token).delete(`/users/agents/${id}`);
       onRefresh();
-    } catch {
-      showError(`Impossible de supprimer l'agent ${name}`);
+    } catch (e: any) {
+      showError(e?.response?.data?.message ?? `Impossible de supprimer l'agent ${name}`);
     }
   };
 
@@ -1102,8 +1102,8 @@ function EquipesView({ token, agents, reports, onOpenDetail, onRefresh, isAdmin,
       await apiClient(token).delete(`/users/agents/${reassign.agent.id}`);
       setReassign(null);
       onRefresh();
-    } catch {
-      showError(`Impossible de réassigner et de supprimer ${reassign.agent.name}`);
+    } catch (e: any) {
+      showError(e?.response?.data?.message ?? `Impossible de réassigner et de supprimer ${reassign.agent.name}`);
     } finally {
       setReassigning(false);
     }
