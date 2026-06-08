@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards, HttpCode, HttpStatus, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -44,9 +44,11 @@ export class UsersController {
   @Post('agents')
   @Roles(Role.ADMIN)
   createAgent(
-    @CurrentUser('communeId') communeId: string,
-    @Body() body: { phone: string; name: string; service?: string },
+    @CurrentUser() user: { communeId: string | null; role: Role },
+    @Body() body: { phone: string; name: string; service?: string; communeId?: string },
   ) {
+    const communeId = user.role === Role.SUPER_ADMIN && body.communeId ? body.communeId : user.communeId;
+    if (!communeId) throw new BadRequestException('Veuillez sélectionner une commune pour cet agent');
     return this.users.createAgent({ ...body, communeId });
   }
 

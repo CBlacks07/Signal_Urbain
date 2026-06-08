@@ -947,11 +947,11 @@ function DetailPanel({ report, agents, onClose, onUpdateStatus, token, onRefresh
 
 const SERVICES = ["Voirie", "Électricité", "Hydraulique", "Environnement", "Éclairage public", "Autre"];
 
-function EquipesView({ token, agents, reports, onOpenDetail, onRefresh, isAdmin }: any) {
+function EquipesView({ token, agents, reports, onOpenDetail, onRefresh, isAdmin, isSuperAdmin }: any) {
   const isNarrow = useMediaQuery(700);
   const [tab, setTab]             = useState<"agents" | "citoyens" | "demandes">(isAdmin ? "agents" : "demandes");
   const [showForm, setShowForm]   = useState(false);
-  const [form, setForm]           = useState({ phone: "", name: "", service: "" });
+  const [form, setForm]           = useState({ phone: "", name: "", service: "", communeId: "" });
   const [loading, setLoading]     = useState(false);
   const [error, setError]         = useState("");
   const [citizens, setCitizens]   = useState<any[]>([]);
@@ -1032,10 +1032,11 @@ function EquipesView({ token, agents, reports, onOpenDetail, onRefresh, isAdmin 
 
   const createAgent = async () => {
     if (!form.phone || !form.name) { setError("Téléphone et nom requis"); return; }
+    if (isSuperAdmin && !form.communeId) { setError("Veuillez sélectionner une commune"); return; }
     setLoading(true); setError("");
     try {
       await apiClient(token).post("/users/agents", form);
-      setForm({ phone: "", name: "", service: "" });
+      setForm({ phone: "", name: "", service: "", communeId: "" });
       setShowForm(false);
       onRefresh();
     } catch (e: any) {
@@ -1175,6 +1176,16 @@ function EquipesView({ token, agents, reports, onOpenDetail, onRefresh, isAdmin 
                 {SERVICES.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
+            {isSuperAdmin && (
+              <div>
+                <label style={{ fontSize: 10.5, fontWeight: 700, color: "#999", textTransform: "uppercase", display: "block", marginBottom: 4 }}>Commune</label>
+                <select value={form.communeId} onChange={e => setForm(v => ({ ...v, communeId: e.target.value }))}
+                  style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1.5px solid #e8e5e0", fontSize: 13, fontFamily: "inherit", outline: "none", background: "#fdfcfa", cursor: "pointer" }}>
+                  <option value="">— Choisir —</option>
+                  {communes.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+            )}
           </div>
           {error && <div style={{ fontSize: 12, color: "#C62828", marginBottom: 12 }}>{error}</div>}
           <div style={{ display: "flex", gap: 10 }}>
@@ -1876,6 +1887,11 @@ function CommunesAdminView({ token }: any) {
   const [showForm, setShowForm] = useState(false);
   const [err, setErr]           = useState("");
 
+  const [editing, setEditing]       = useState<any>(null);
+  const [editForm, setEditForm]     = useState<any>(null);
+  const [editError, setEditError]   = useState("");
+  const [editSaving, setEditSaving] = useState(false);
+
   const load = async () => {
     try { const { data } = await apiClient(token).get("/admin/communes"); setCommunes(data); }
     catch { setErr("Erreur de chargement"); }
@@ -1896,6 +1912,33 @@ function CommunesAdminView({ token }: any) {
     if (!confirm(`Supprimer la commune "${name}" ?`)) return;
     try { await apiClient(token).delete(`/admin/communes/${id}`); load(); }
     catch { setErr("Impossible de supprimer (des utilisateurs sont liés)"); }
+  };
+
+  const openEdit = (commune: any) => {
+    setEditing(commune);
+    setEditForm({
+      name: commune.name ?? "", prefecture: commune.prefecture ?? "",
+      contactEmail: commune.contactEmail ?? "", contactPhone: commune.contactPhone ?? "",
+    });
+    setEditError("");
+  };
+
+  const saveEdit = async () => {
+    if (!editing) return;
+    if (!editForm.name || !editForm.prefecture) { setEditError("Nom et préfecture requis"); return; }
+    setEditSaving(true); setEditError("");
+    try {
+      await apiClient(token).patch(`/admin/communes/${editing.id}`, {
+        name: editForm.name, prefecture: editForm.prefecture,
+        contactEmail: editForm.contactEmail || undefined, contactPhone: editForm.contactPhone || undefined,
+      });
+      setEditing(null);
+      load();
+    } catch (e: any) {
+      setEditError(e?.response?.data?.message ?? "Impossible de modifier cette commune");
+    } finally {
+      setEditSaving(false);
+    }
   };
 
   if (loading) return <div style={{ padding: 40, color: "#bbb" }}>Chargement...</div>;
@@ -1941,9 +1984,14 @@ function CommunesAdminView({ token }: any) {
                 <div style={{ fontWeight: 700, fontSize: 15, color: "#1A1A1A" }}>{c.name}</div>
                 <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>{c.prefecture}</div>
               </div>
-              <button onClick={() => remove(c.id, c.name)} style={{ background: "#FFEBEE", border: "none", borderRadius: 8, padding: "4px 10px", fontSize: 11, color: "#C62828", fontWeight: 700, cursor: "pointer" }}>
-                Supprimer
-              </button>
+              <div style={{ display: "flex", gap: 6 }}>
+                <button onClick={() => openEdit(c)} style={{ background: "#E8F0EA", border: "none", borderRadius: 8, padding: "4px 10px", fontSize: 11, color: "#1A472A", fontWeight: 700, cursor: "pointer" }}>
+                  Modifier
+                </button>
+                <button onClick={() => remove(c.id, c.name)} style={{ background: "#FFEBEE", border: "none", borderRadius: 8, padding: "4px 10px", fontSize: 11, color: "#C62828", fontWeight: 700, cursor: "pointer" }}>
+                  Supprimer
+                </button>
+              </div>
             </div>
             <div style={{ display: "flex", gap: 16, marginTop: 12, paddingTop: 12, borderTop: "1px solid #f5f2ed" }}>
               <div style={{ fontSize: 12, color: "#555" }}><span style={{ fontWeight: 700, color: "#1A472A" }}>{c._count?.users ?? 0}</span> utilisateurs</div>
@@ -1953,6 +2001,44 @@ function CommunesAdminView({ token }: any) {
           </div>
         ))}
       </div>
+
+      {editing && editForm && (
+        <Modal title={`Modifier ${editing.name}`} onClose={() => setEditing(null)}>
+          <div style={{ display: "grid", gap: 12, marginBottom: 16 }}>
+            <div>
+              <label style={{ fontSize: 10.5, fontWeight: 700, color: "#999", textTransform: "uppercase", display: "block", marginBottom: 4 }}>Nom *</label>
+              <input value={editForm.name} onChange={e => setEditForm((v: any) => ({ ...v, name: e.target.value }))}
+                style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1.5px solid #e8e5e0", fontSize: 13, fontFamily: "inherit", outline: "none", background: "#fdfcfa", boxSizing: "border-box" }} />
+            </div>
+            <div>
+              <label style={{ fontSize: 10.5, fontWeight: 700, color: "#999", textTransform: "uppercase", display: "block", marginBottom: 4 }}>Préfecture *</label>
+              <input value={editForm.prefecture} onChange={e => setEditForm((v: any) => ({ ...v, prefecture: e.target.value }))}
+                style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1.5px solid #e8e5e0", fontSize: 13, fontFamily: "inherit", outline: "none", background: "#fdfcfa", boxSizing: "border-box" }} />
+            </div>
+            <div>
+              <label style={{ fontSize: 10.5, fontWeight: 700, color: "#999", textTransform: "uppercase", display: "block", marginBottom: 4 }}>Email contact</label>
+              <input value={editForm.contactEmail} onChange={e => setEditForm((v: any) => ({ ...v, contactEmail: e.target.value }))}
+                style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1.5px solid #e8e5e0", fontSize: 13, fontFamily: "inherit", outline: "none", background: "#fdfcfa", boxSizing: "border-box" }} />
+            </div>
+            <div>
+              <label style={{ fontSize: 10.5, fontWeight: 700, color: "#999", textTransform: "uppercase", display: "block", marginBottom: 4 }}>Téléphone contact</label>
+              <input value={editForm.contactPhone} onChange={e => setEditForm((v: any) => ({ ...v, contactPhone: e.target.value }))}
+                style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1.5px solid #e8e5e0", fontSize: 13, fontFamily: "inherit", outline: "none", background: "#fdfcfa", boxSizing: "border-box" }} />
+            </div>
+          </div>
+          {editError && <div style={{ fontSize: 12, color: "#C62828", marginBottom: 12 }}>{editError}</div>}
+          <div style={{ display: "flex", gap: 10 }}>
+            <button onClick={saveEdit} disabled={editSaving}
+              style={{ padding: "10px 24px", background: "#1A472A", color: "#fff", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: "pointer", opacity: editSaving ? 0.7 : 1 }}>
+              {editSaving ? "Enregistrement..." : "Enregistrer"}
+            </button>
+            <button onClick={() => setEditing(null)}
+              style={{ padding: "10px 16px", background: "#f5f2ed", color: "#666", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+              Annuler
+            </button>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
@@ -2163,7 +2249,7 @@ export default function MairieDashboard() {
             {page === "incidents"  && <IncidentsView reports={reports} onOpenDetail={setDetailReport} />}
             {page === "stats"      && <StatsView reports={reports} />}
             {page === "equipes"    && ((isAdmin || isAgent)
-              ? <EquipesView token={token} agents={agents} reports={reports} onOpenDetail={setDetailReport} onRefresh={() => fetchAgents(token!)} isAdmin={isAdmin} />
+              ? <EquipesView token={token} agents={agents} reports={reports} onOpenDetail={setDetailReport} onRefresh={() => fetchAgents(token!)} isAdmin={isAdmin} isSuperAdmin={isSuperAdmin} />
               : <div style={{ padding: 48, textAlign: "center", color: "#bbb", fontSize: 14 }}>Accès réservé aux administrateurs et agents.</div>
             )}
             {page === "carte"      && <CarteView reports={reports} onOpenDetail={setDetailReport} />}
