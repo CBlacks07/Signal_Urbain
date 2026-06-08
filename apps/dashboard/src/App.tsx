@@ -45,11 +45,24 @@ const getToken = () => localStorage.getItem(TOKEN_KEY);
 const saveToken = (t: string) => localStorage.setItem(TOKEN_KEY, t);
 const clearToken = () => localStorage.removeItem(TOKEN_KEY);
 
-const apiClient = (token?: string | null) =>
-  axios.create({
+const apiClient = (token?: string | null) => {
+  const instance = axios.create({
     baseURL: API_BASE,
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
+  // Session expirée (token périmé après une longue absence) : on nettoie et on revient au login
+  instance.interceptors.response.use(
+    (res) => res,
+    (err) => {
+      if (token && err?.response?.status === 401) {
+        clearToken();
+        window.location.reload();
+      }
+      return Promise.reject(err);
+    },
+  );
+  return instance;
+};
 
 const decodeJwt = (token: string): { sub: string; role: string } | null => {
   try { return JSON.parse(atob(token.split('.')[1])); } catch { return null; }
@@ -1005,7 +1018,7 @@ function EquipesView({ token, agents, onRefresh }: any) {
     <div style={{ animation: "fadeIn 0.4s ease" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
         <div>
-          <h1 style={{ fontSize: 26, fontWeight: 800, color: "#1a1a1a", margin: "0 0 4px", fontFamily: "'Outfit', sans-serif" }}>Utilisateurs</h1>
+          <h1 style={{ fontSize: 26, fontWeight: 800, color: "#1a1a1a", margin: "0 0 4px", fontFamily: "'Outfit', sans-serif" }}>Équipes</h1>
           <p style={{ fontSize: 13, color: "#999", margin: 0 }}>
             {tab === "agents" ? `${agents.length} agent${agents.length !== 1 ? "s" : ""}` : `${citizens.length} citoyen${citizens.length !== 1 ? "s" : ""}`}
           </p>
