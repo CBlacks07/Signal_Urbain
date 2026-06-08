@@ -51,6 +51,12 @@
         "projectId": "4e6ca37c-d722-46de-8909-8c699a479c32"
       }
     },
-    "owner": "opscorporation"
+    "owner": "opscorporation",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/4e6ca37c-d722-46de-8909-8c699a479c32"
+    }
   }
 }
