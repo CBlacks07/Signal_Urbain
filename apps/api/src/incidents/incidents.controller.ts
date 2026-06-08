@@ -17,7 +17,15 @@ export class IncidentsController {
   @Get()
   @Roles(Role.CITIZEN)
   @ApiOperation({ summary: 'Lister les incidents (filtrés, paginés)' })
-  findAll(@Query() query: ListIncidentsDto) {
+  findAll(
+    @CurrentUser() user: { communeId: string | null; role: Role },
+    @Query() query: ListIncidentsDto,
+  ) {
+    // Agents et admins ne voient que les incidents de leur commune ;
+    // seul le super-admin a une vue sur toutes les communes
+    if ((user.role === Role.AGENT || user.role === Role.ADMIN) && user.communeId) {
+      query.communeId = user.communeId;
+    }
     return this.incidents.findAll(query);
   }
 

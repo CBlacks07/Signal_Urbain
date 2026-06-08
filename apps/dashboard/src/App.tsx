@@ -1219,7 +1219,9 @@ function EquipesView({ token, agents, reports, onOpenDetail, onRefresh, isAdmin,
                     <Avatar initials={initials} size={44} color={isAdmin ? "#1A472A" : "#2B7A9B"} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{agent.name}</div>
-                      <div style={{ fontSize: 11, color: "#999" }}>{agent.phone}</div>
+                      <div style={{ fontSize: 11, color: "#999" }}>
+                        {agent.phone}{isSuperAdmin && agent.commune?.name ? ` · ${agent.commune.name}` : ""}
+                      </div>
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
                       <span style={{ padding: "3px 10px", borderRadius: 20, fontSize: 10, fontWeight: 700, color: isAdmin ? "#1A472A" : "#2B7A9B", background: isAdmin ? "#E8F5E9" : "#E3F2FD" }}>
@@ -1287,7 +1289,7 @@ function EquipesView({ token, agents, reports, onOpenDetail, onRefresh, isAdmin,
             <div style={{ padding: 48, textAlign: "center", color: "#bbb", fontSize: 13 }}>Chargement…</div>
           ) : filteredCitizens.length === 0 ? (
             <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #ede9e3", padding: 48, textAlign: "center", color: "#bbb", fontSize: 13 }}>
-              {search ? "Aucun citoyen ne correspond à la recherche." : "Aucun citoyen enregistré dans cette commune."}
+              {search ? "Aucun citoyen ne correspond à la recherche." : isSuperAdmin ? "Aucun citoyen enregistré." : "Aucun citoyen enregistré dans cette commune."}
             </div>
           ) : (
             <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #ede9e3", overflow: "hidden" }}>
@@ -1318,7 +1320,7 @@ function EquipesView({ token, agents, reports, onOpenDetail, onRefresh, isAdmin,
                           {c.name ?? "—"}
                         </div>
                         <div style={{ fontSize: 10, color: c.isVerified ? "#2E7D32" : "#999", fontWeight: 600 }}>
-                          {c.isVerified ? "Vérifié" : "Non vérifié"}
+                          {c.isVerified ? "Vérifié" : "Non vérifié"}{isSuperAdmin && c.commune?.name ? ` · ${c.commune.name}` : ""}
                         </div>
                       </div>
                     </div>

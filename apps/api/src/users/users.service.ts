@@ -22,10 +22,11 @@ export class UsersService {
     });
   }
 
-  async findAgents(communeId: string) {
+  async findAgents(communeId?: string) {
     const agents = await this.prisma.user.findMany({
-      where: { communeId, role: { in: [Role.AGENT, Role.ADMIN] } },
+      where: { ...(communeId ? { communeId } : {}), role: { in: [Role.AGENT, Role.ADMIN] } },
       include: {
+        commune: { select: { id: true, name: true } },
         _count: {
           select: {
             assignedIncidents: true,
@@ -46,11 +47,12 @@ export class UsersService {
     return withResolved;
   }
 
-  async findCitizens(communeId: string) {
+  async findCitizens(communeId?: string) {
     return this.prisma.user.findMany({
-      where: { communeId, role: Role.CITIZEN },
+      where: { ...(communeId ? { communeId } : {}), role: Role.CITIZEN },
       select: {
         id: true, name: true, phone: true, createdAt: true, isVerified: true,
+        commune: { select: { id: true, name: true } },
         _count: { select: { reportedIncidents: true, upvotes: true } },
       },
       orderBy: { createdAt: 'desc' },
@@ -137,19 +139,21 @@ export class UsersService {
     return { ...updated, pendingCommuneChange };
   }
 
-  async findCommuneRequests(communeId: string) {
+  async findCommuneRequests(communeId?: string) {
     return this.prisma.communeChangeRequest.findMany({
-      where: { toCommuneId: communeId, status: 'PENDING' },
+      where: { ...(communeId ? { toCommuneId: communeId } : {}), status: 'PENDING' },
       include: { user: { select: { id: true, name: true, phone: true } }, fromCommune: true, toCommune: true },
       orderBy: { createdAt: 'asc' },
     });
   }
 
-  async reviewCommuneRequest(id: string, reviewer: { id: string; communeId: string }, action: 'APPROVE' | 'REJECT', note?: string) {
+  async reviewCommuneRequest(id: string, reviewer: { id: string; communeId: string | null; role: Role }, action: 'APPROVE' | 'REJECT', note?: string) {
     const request = await this.prisma.communeChangeRequest.findUnique({ where: { id }, include: { toCommune: true, user: true } });
     if (!request) throw new NotFoundException('Demande introuvable');
     if (request.status !== 'PENDING') throw new BadRequestException('Cette demande a déjà été traitée');
-    if (request.toCommuneId !== reviewer.communeId) throw new ForbiddenException('Vous ne pouvez traiter que les demandes de votre commune');
+    if (reviewer.role !== Role.SUPER_ADMIN && request.toCommuneId !== reviewer.communeId) {
+      throw new ForbiddenException('Vous ne pouvez traiter que les demandes de votre commune');
+    }
 
     if (action === 'APPROVE') {
       await this.prisma.$transaction([

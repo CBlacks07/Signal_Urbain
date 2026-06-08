@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards, HttpCode, HttpStatus, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards, HttpCode, HttpStatus, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -31,14 +31,24 @@ export class UsersController {
 
   @Get('agents')
   @Roles(Role.ADMIN)
-  getAgents(@CurrentUser('communeId') communeId: string) {
-    return this.users.findAgents(communeId);
+  getAgents(
+    @CurrentUser() user: { communeId: string | null; role: Role },
+    @Query('communeId') communeId?: string,
+  ) {
+    // Le super-admin n'est rattaché à aucune commune : il voit tout le monde,
+    // ou peut filtrer sur une commune précise via ?communeId=
+    const scope = user.role === Role.SUPER_ADMIN ? communeId : (user.communeId ?? undefined);
+    return this.users.findAgents(scope);
   }
 
   @Get('citizens')
   @Roles(Role.ADMIN)
-  getCitizens(@CurrentUser('communeId') communeId: string) {
-    return this.users.findCitizens(communeId);
+  getCitizens(
+    @CurrentUser() user: { communeId: string | null; role: Role },
+    @Query('communeId') communeId?: string,
+  ) {
+    const scope = user.role === Role.SUPER_ADMIN ? communeId : (user.communeId ?? undefined);
+    return this.users.findCitizens(scope);
   }
 
   @Post('agents')
@@ -81,15 +91,19 @@ export class UsersController {
 
   @Get('commune-requests')
   @Roles(Role.AGENT)
-  getCommuneRequests(@CurrentUser('communeId') communeId: string) {
-    return this.users.findCommuneRequests(communeId);
+  getCommuneRequests(
+    @CurrentUser() user: { communeId: string | null; role: Role },
+    @Query('communeId') communeId?: string,
+  ) {
+    const scope = user.role === Role.SUPER_ADMIN ? communeId : (user.communeId ?? undefined);
+    return this.users.findCommuneRequests(scope);
   }
 
   @Patch('commune-requests/:id')
   @Roles(Role.AGENT)
   reviewCommuneRequest(
     @Param('id') id: string,
-    @CurrentUser() reviewer: { id: string; communeId: string },
+    @CurrentUser() reviewer: { id: string; communeId: string | null; role: Role },
     @Body() body: { action: 'APPROVE' | 'REJECT'; note?: string },
   ) {
     return this.users.reviewCommuneRequest(id, reviewer, body.action, body.note);
