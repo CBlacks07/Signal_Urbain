@@ -6,6 +6,7 @@ import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { CommentsService } from './comments.service';
+import { CreateCommentDto } from './dto/create-comment.dto';
 
 @ApiTags('Comments')
 @ApiBearerAuth()
@@ -26,9 +27,9 @@ export class CommentsController {
     @Param('incidentId') incidentId: string,
     @CurrentUser('id') userId: string,
     @CurrentUser('role') role: Role,
-    @Body() body: { content: string; isInternal?: boolean },
+    @Body() body: CreateCommentDto,
   ) {
-    const isInternal = body.isInternal && role !== Role.CITIZEN;
+    const isInternal = !!body.isInternal && role !== Role.CITIZEN;
     return this.comments.create(incidentId, userId, body.content, isInternal);
   }
 }

@@ -92,6 +92,7 @@ model OtpCode {
   code      String
   expiresAt DateTime
   usedAt    DateTime?
+  attempts  Int      @default(0) // nombre d'essais erronés ; le code est invalidé au-delà du seuil
   createdAt DateTime @default(now())
 
   @@index([userId])

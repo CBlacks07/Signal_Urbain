@@ -26,6 +26,7 @@ export class AuthController {
 
   @Post('verify-otp')
   @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { ttl: 600_000, limit: 10 } })
   @ApiOperation({ summary: 'Vérifier le code OTP et obtenir les tokens JWT' })
   verifyOtp(@Body() dto: VerifyOtpDto) {
     return this.authService.verifyOtp(dto.phone, dto.code, dto.name);

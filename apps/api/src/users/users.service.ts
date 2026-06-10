@@ -142,7 +142,16 @@ export class UsersService {
     const user = await this.prisma.user.findUnique({ where: { id } });
     if (!user) throw new NotFoundException('Utilisateur introuvable');
 
-    const { communeId, ...rest } = data;
+    // Liste blanche stricte : on ne propage jamais le corps brut vers Prisma,
+    // afin qu'aucun champ sensible (role, isVerified, isActive…) ne puisse être écrit
+    // même si la ValidationPipe était contournée.
+    const rest: Prisma.UserUpdateInput = {};
+    if (data.name !== undefined) rest.name = data.name;
+    if (data.email !== undefined) rest.email = data.email;
+    if (data.avatarUrl !== undefined) rest.avatarUrl = data.avatarUrl;
+    if (data.fcmToken !== undefined) rest.fcmToken = data.fcmToken;
+
+    const { communeId } = data;
     const wantsCommuneChange = communeId !== undefined && communeId !== null && communeId !== user.communeId;
 
     if (wantsCommuneChange && user.role === Role.CITIZEN && user.communeId !== null) {
@@ -173,7 +182,16 @@ export class UsersService {
       return { ...updated, pendingCommuneChange: { toCommuneId: communeId!, toCommuneName: toCommune.name } };
     }
 
-    const updated = await this.prisma.user.update({ where: { id }, data, include: { commune: true } });
+    // Hors workflow de validation : première sélection de commune (communeId actuel null)
+    // ou compte non-citoyen → la commune s'applique immédiatement.
+    const finalData: Prisma.UserUpdateInput = { ...rest };
+    if (wantsCommuneChange) {
+      const toCommune = await this.prisma.commune.findUnique({ where: { id: communeId! } });
+      if (!toCommune) throw new NotFoundException('Commune introuvable');
+      finalData.commune = { connect: { id: communeId! } };
+    }
+
+    const updated = await this.prisma.user.update({ where: { id }, data: finalData, include: { commune: true } });
     const pendingCommuneChange = await this.findPendingCommuneRequest(id);
     return { ...updated, pendingCommuneChange };
   }

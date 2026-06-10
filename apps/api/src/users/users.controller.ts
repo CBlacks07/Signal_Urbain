@@ -6,6 +6,9 @@ import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { UsersService } from './users.service';
+import { UpdateMeDto } from './dto/update-me.dto';
+import { CreateAgentDto } from './dto/create-agent.dto';
+import { UpdateAgentDto } from './dto/update-agent.dto';
 
 @ApiTags('Users')
 @ApiBearerAuth()
@@ -22,7 +25,7 @@ export class UsersController {
   @Patch('me')
   updateMe(
     @CurrentUser('id') userId: string,
-    @Body() body: { name?: string; email?: string; communeId?: string; fcmToken?: string },
+    @Body() body: UpdateMeDto,
   ) {
     return this.users.update(userId, body);
   }
@@ -55,7 +58,7 @@ export class UsersController {
   @Roles(Role.ADMIN)
   createAgent(
     @CurrentUser() user: { communeId: string | null; role: Role },
-    @Body() body: { phone: string; name: string; service?: string; communeId?: string },
+    @Body() body: CreateAgentDto,
   ) {
     const communeId = user.role === Role.SUPER_ADMIN && body.communeId ? body.communeId : user.communeId;
     if (!communeId) throw new BadRequestException('Veuillez sélectionner une commune pour cet agent');
@@ -67,7 +70,7 @@ export class UsersController {
   updateAgent(
     @Param('id') id: string,
     @CurrentUser() user: { communeId: string | null; role: Role },
-    @Body() body: { name?: string; phone?: string; role?: Role; service?: string; communeId?: string; isActive?: boolean },
+    @Body() body: UpdateAgentDto,
   ) {
     return this.users.updateAgent(id, user, body);
   }
@@ -114,7 +117,10 @@ export class UsersController {
     return this.users.reviewCommuneRequest(id, reviewer, body.action, body.note);
   }
 
+  // Réservé aux administrateurs : éviter qu'un citoyen énumère les profils
+  // (et récolte les numéros de téléphone) via /users/:id.
   @Get(':id')
+  @Roles(Role.ADMIN)
   getOne(@Param('id') id: string) {
     return this.users.findById(id);
   }

@@ -6,6 +6,7 @@ import { PrismaService } from '../common/prisma/prisma.service';
 @Injectable()
 export class OtpService {
   private readonly logger = new Logger(OtpService.name);
+  private static readonly MAX_ATTEMPTS = 5;
 
   constructor(
     private prisma: PrismaService,
@@ -43,22 +44,32 @@ export class OtpService {
     const user = await this.prisma.user.findUnique({ where: { phone } });
     if (!user) return false;
 
-    const otpRecord = await this.prisma.otpCode.findFirst({
-      where: {
-        userId: user.id,
-        code,
-        usedAt: null,
-        expiresAt: { gt: new Date() },
-      },
+    // On récupère le dernier code actif SANS filtrer sur sa valeur, afin de
+    // comptabiliser les essais erronés et de bloquer le brute-force.
+    const active = await this.prisma.otpCode.findFirst({
+      where: { userId: user.id, usedAt: null, expiresAt: { gt: new Date() } },
+      orderBy: { createdAt: 'desc' },
     });
+    if (!active) return false;
 
-    if (!otpRecord) return false;
+    // Trop d'essais erronés : on invalide définitivement le code.
+    if (active.attempts >= OtpService.MAX_ATTEMPTS) {
+      await this.prisma.otpCode.update({ where: { id: active.id }, data: { usedAt: new Date() } });
+      return false;
+    }
+
+    if (active.code !== code) {
+      await this.prisma.otpCode.update({
+        where: { id: active.id },
+        data: { attempts: { increment: 1 } },
+      });
+      return false;
+    }
 
     await this.prisma.otpCode.update({
-      where: { id: otpRecord.id },
+      where: { id: active.id },
       data: { usedAt: new Date() },
     });
-
     return true;
   }
 

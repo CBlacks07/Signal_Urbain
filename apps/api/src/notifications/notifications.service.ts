@@ -67,8 +67,10 @@ export class NotificationsService {
   }
 
   markRead(id: string, userId: string) {
-    return this.prisma.notification.update({
-      where: { id },
+    // updateMany avec le userId : empêche un utilisateur de marquer lues
+    // les notifications d'un autre compte (IDOR).
+    return this.prisma.notification.updateMany({
+      where: { id, userId },
       data: { isRead: true },
     });
   }

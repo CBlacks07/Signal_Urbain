@@ -193,12 +193,15 @@ export class IncidentsService {
   }
 
   async upvote(incidentId: string, userId: string) {
+    // On n'incrémente le compteur que si le soutien n'existait pas déjà,
+    // sinon un appel répété gonflerait artificiellement upvotesCount.
+    const existing = await this.prisma.upvote.findUnique({
+      where: { userId_incidentId: { userId, incidentId } },
+    });
+    if (existing) return { upvoted: true };
+
     await this.prisma.$transaction([
-      this.prisma.upvote.upsert({
-        where: { userId_incidentId: { userId, incidentId } },
-        create: { userId, incidentId },
-        update: {},
-      }),
+      this.prisma.upvote.create({ data: { userId, incidentId } }),
       this.prisma.incident.update({
         where: { id: incidentId },
         data: { upvotesCount: { increment: 1 } },
@@ -208,6 +211,12 @@ export class IncidentsService {
   }
 
   async removeUpvote(incidentId: string, userId: string) {
+    // Idempotent : si le soutien n'existe pas, on ne décrémente pas (et pas de 500).
+    const existing = await this.prisma.upvote.findUnique({
+      where: { userId_incidentId: { userId, incidentId } },
+    });
+    if (!existing) return { upvoted: false };
+
     await this.prisma.$transaction([
       this.prisma.upvote.delete({
         where: { userId_incidentId: { userId, incidentId } },
