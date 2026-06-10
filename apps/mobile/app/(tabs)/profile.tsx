@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, ScrollView, Image } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { apiClient, getToken, clearToken } from '../../lib/api';
 import { COLORS } from '../../lib/theme';
@@ -104,7 +104,7 @@ export default function ProfileScreen() {
 
         <View style={styles.profileRow}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{initials}</Text>
+            <Image source={require('../../assets/icon.png')} style={styles.avatarImg} resizeMode="cover" />
           </View>
           <View style={styles.profileInfo}>
             <Text style={styles.name}>{displayName}</Text>
@@ -186,7 +186,8 @@ const styles = StyleSheet.create({
   headerTitle:  { fontSize: 18, fontWeight: '700', color: '#1A1A1A' },
   settingsBtn:  { width: 36, height: 36, borderRadius: 18, backgroundColor: '#F5F4F2', alignItems: 'center', justifyContent: 'center' },
   profileRow:   { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  avatar:       { width: 56, height: 56, borderRadius: 28, backgroundColor: COLORS.dark, alignItems: 'center', justifyContent: 'center' },
+  avatar:       { width: 56, height: 56, borderRadius: 28, backgroundColor: COLORS.dark, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  avatarImg:    { width: 56, height: 56 },
   avatarText:   { fontSize: 20, fontWeight: '800', color: '#fff' },
   profileInfo:  { flex: 1 },
   name:         { fontSize: 17, fontWeight: '700', color: '#1A1A1A' },
