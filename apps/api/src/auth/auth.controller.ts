@@ -10,13 +10,16 @@ import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { ChangePhoneDto } from './dto/change-phone.dto';
 
+// NB : pas de @Public() au niveau de la classe — sinon il s'appliquerait aussi
+// aux routes protégées (change-phone, logout-all) et court-circuiterait leur
+// JwtAuthGuard. On marque @Public() uniquement les routes réellement ouvertes.
 @ApiTags('Auth')
 @Controller('auth')
-@Public()
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('request-otp')
+  @Public()
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { ttl: 3600_000, limit: 5 } })
   @ApiOperation({ summary: 'Demander un code OTP par SMS' })
@@ -25,6 +28,7 @@ export class AuthController {
   }
 
   @Post('verify-otp')
+  @Public()
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { ttl: 600_000, limit: 10 } })
   @ApiOperation({ summary: 'Vérifier le code OTP et obtenir les tokens JWT' })
@@ -33,6 +37,7 @@ export class AuthController {
   }
 
   @Post('refresh')
+  @Public()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Rafraîchir le token d'accès" })
   refresh(@Body() dto: RefreshTokenDto) {
@@ -48,5 +53,13 @@ export class AuthController {
     @Body() body: ChangePhoneDto,
   ) {
     return this.authService.changePhone(userId, body.newPhone, body.code);
+  }
+
+  @Post('logout-all')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Révoquer toutes les sessions actives (déconnexion globale)' })
+  logoutAll(@CurrentUser('id') userId: string) {
+    return this.authService.logoutAll(userId);
   }
 }

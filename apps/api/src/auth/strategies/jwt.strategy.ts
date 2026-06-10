@@ -16,12 +16,18 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  async validate(payload: { sub: string; role: string }) {
+  async validate(payload: { sub: string; role: string; tokenVersion?: number }) {
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
-      select: { id: true, phone: true, name: true, role: true, communeId: true, isVerified: true },
+      select: { id: true, phone: true, name: true, role: true, communeId: true, isVerified: true, isActive: true, tokenVersion: true },
     });
     if (!user) throw new UnauthorizedException();
+    // Compte desactive : on refuse l'acces.
+    if (!user.isActive) throw new UnauthorizedException('Compte désactivé');
+    // Token emis avant une revocation globale (logout-all) : invalide.
+    if ((payload.tokenVersion ?? 0) !== user.tokenVersion) {
+      throw new UnauthorizedException('Session révoquée, reconnectez-vous');
+    }
     return user;
   }
 }

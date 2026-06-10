@@ -50,7 +50,7 @@ export class AuthService {
     }
 
     return {
-      ...this.generateTokens(user.id, user.role),
+      ...this.generateTokens(user.id, user.role, user.tokenVersion),
       // Le client doit demander le nom si le compte est encore sur le placeholder
       needsProfile: isFirstLogin && !name?.trim(),
     };
@@ -78,14 +78,27 @@ export class AuthService {
       });
       const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
       if (!user) throw new UnauthorizedException();
-      return this.generateTokens(user.id, user.role);
+      // Refuse un refresh token emis avant une revocation globale (logout-all)
+      if ((payload.tokenVersion ?? 0) !== user.tokenVersion) {
+        throw new UnauthorizedException('Session révoquée');
+      }
+      return this.generateTokens(user.id, user.role, user.tokenVersion);
     } catch {
       throw new UnauthorizedException('Refresh token invalide');
     }
   }
 
-  private generateTokens(userId: string, role: string) {
-    const payload = { sub: userId, role };
+  /** Revoque toutes les sessions de l'utilisateur en incrementant tokenVersion. */
+  async logoutAll(userId: string) {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { tokenVersion: { increment: 1 } },
+    });
+    return { message: 'Toutes les sessions ont été révoquées' };
+  }
+
+  private generateTokens(userId: string, role: string, tokenVersion: number) {
+    const payload = { sub: userId, role, tokenVersion };
     return {
       access_token: this.jwt.sign(payload, {
         expiresIn: this.config.get('JWT_ACCESS_EXPIRES', '15m'),

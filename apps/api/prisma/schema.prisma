@@ -67,6 +67,7 @@ model User {
   isVerified  Boolean  @default(false)
   isActive    Boolean  @default(true)
   fcmToken    String?  // Firebase push token
+  tokenVersion Int     @default(0) // incrémenté pour révoquer toutes les sessions (logout-all)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

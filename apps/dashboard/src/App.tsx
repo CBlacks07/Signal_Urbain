@@ -1787,6 +1787,19 @@ function ParametresView({ token, onLogout }: any) {
   const [notifPrefs, setNotifPrefs] = useState(() => {
     try { return JSON.parse(localStorage.getItem(NOTIF_KEY) ?? "{}"); } catch { return {}; }
   });
+  const [logoutLoad, setLogoutLoad] = useState(false);
+
+  // Révocation serveur de toutes les sessions, puis déconnexion locale.
+  const logoutAllDevices = async () => {
+    setLogoutLoad(true);
+    try {
+      await apiClient(token).post("/auth/logout-all");
+    } catch { /* on déconnecte localement quoi qu'il arrive */ }
+    finally {
+      setLogoutLoad(false);
+      onLogout();
+    }
+  };
 
   useEffect(() => {
     apiClient(token).get("/users/me").then(r => setMe(r.data)).catch(() => {});
@@ -1931,10 +1944,10 @@ function ParametresView({ token, onLogout }: any) {
               Vous devrez vous reconnecter via OTP pour accéder à nouveau au dashboard.
             </p>
           </div>
-          <button onClick={onLogout} style={btn("#C62828")}>
-            Confirmer la déconnexion
+          <button onClick={logoutAllDevices} disabled={logoutLoad} style={btn("#C62828")}>
+            {logoutLoad ? "Révocation…" : "Confirmer la déconnexion"}
           </button>
-          <button onClick={() => setModal(null)} style={btn("#f5f2ed", "#666")}>
+          <button onClick={() => setModal(null)} disabled={logoutLoad} style={btn("#f5f2ed", "#666")}>
             Annuler
           </button>
         </Modal>

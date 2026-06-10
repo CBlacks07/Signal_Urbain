@@ -26,6 +26,13 @@ export class IncidentsController {
     if ((user.role === Role.AGENT || user.role === Role.ADMIN) && user.communeId) {
       query.communeId = user.communeId;
     }
+
+    // Un citoyen ne voit que le fil de SA commune (sauf quand il consulte ses
+    // propres signalements via reporterId). Empeche de voir toute la base.
+    if (user.role === Role.CITIZEN && user.communeId && !query.reporterId) {
+      query.communeId = user.communeId;
+    }
+
     return this.incidents.findAll(query);
   }
 
