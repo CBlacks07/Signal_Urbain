@@ -60,7 +60,29 @@ export class UsersService {
     });
   }
 
-  async updateAgent(id: string, data: { name?: string; phone?: string; role?: Role; service?: string; communeId?: string; isActive?: boolean }) {
+  /** Vérifie qu'un ADMIN ne gère que les agents de sa propre commune (le SUPER_ADMIN gère tout) */
+  private async assertAgentInScope(agentId: string, admin: { communeId: string | null; role: Role }) {
+    if (admin.role === Role.SUPER_ADMIN) return;
+    const agent = await this.prisma.user.findUnique({ where: { id: agentId }, select: { communeId: true } });
+    if (!agent) throw new NotFoundException('Agent introuvable');
+    if (agent.communeId !== admin.communeId) {
+      throw new ForbiddenException('Vous ne pouvez gérer que les agents de votre commune');
+    }
+  }
+
+  async updateAgent(id: string, admin: { communeId: string | null; role: Role }, data: { name?: string; phone?: string; role?: Role; service?: string; communeId?: string; isActive?: boolean }) {
+    await this.assertAgentInScope(id, admin);
+
+    if (admin.role !== Role.SUPER_ADMIN) {
+      // Un ADMIN ne peut pas s'octroyer (ou octroyer) le rôle SUPER_ADMIN, ni déplacer un agent vers une autre commune
+      if (data.role === Role.SUPER_ADMIN) {
+        throw new ForbiddenException('Seul un super-administrateur peut attribuer ce rôle');
+      }
+      if (data.communeId !== undefined && data.communeId !== admin.communeId) {
+        throw new ForbiddenException('Vous ne pouvez pas changer la commune de cet agent');
+      }
+    }
+
     try {
       return await this.prisma.user.update({ where: { id }, data });
     } catch (e) {
@@ -71,7 +93,8 @@ export class UsersService {
     }
   }
 
-  async removeAgent(id: string) {
+  async removeAgent(id: string, admin: { communeId: string | null; role: Role }) {
+    await this.assertAgentInScope(id, admin);
     try {
       return await this.prisma.user.delete({ where: { id } });
     } catch (e) {
@@ -82,7 +105,9 @@ export class UsersService {
     }
   }
 
-  async reassignIncidents(fromId: string, toId: string) {
+  async reassignIncidents(fromId: string, toId: string, admin: { communeId: string | null; role: Role }) {
+    await this.assertAgentInScope(fromId, admin);
+    await this.assertAgentInScope(toId, admin);
     return this.prisma.incident.updateMany({
       where: { assignedTo: fromId, status: { notIn: ['RESOLU', 'REJETE'] } },
       data: { assignedTo: toId },

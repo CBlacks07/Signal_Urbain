@@ -8,6 +8,7 @@ import { AuthService } from './auth.service';
 import { RequestOtpDto } from './dto/request-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
+import { ChangePhoneDto } from './dto/change-phone.dto';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -43,7 +44,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Changer de numéro après vérification OTP' })
   changePhone(
     @CurrentUser('id') userId: string,
-    @Body() body: { newPhone: string; code: string },
+    @Body() body: ChangePhoneDto,
   ) {
     return this.authService.changePhone(userId, body.newPhone, body.code);
   }

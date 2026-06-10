@@ -145,12 +145,14 @@ export class IncidentsService {
     return incident;
   }
 
-  async update(id: string, agentId: string, agentRole: Role, dto: UpdateIncidentDto) {
+  async update(id: string, agentId: string, agentRole: Role, agentCommuneId: string | null, dto: UpdateIncidentDto) {
     const incident = await this.prisma.incident.findUnique({ where: { id } });
     if (!incident) throw new NotFoundException();
 
-    // Un AGENT ne peut modifier que sa commune
-    // (vérification simplifiée — à compléter avec communeId de l'agent)
+    // Un AGENT/ADMIN ne peut modifier que les incidents de sa commune ; le SUPER_ADMIN voit tout
+    if (agentRole !== Role.SUPER_ADMIN && incident.communeId !== agentCommuneId) {
+      throw new ForbiddenException('Vous ne pouvez modifier que les incidents de votre commune');
+    }
 
     const updates: any = {};
     if (dto.status) {

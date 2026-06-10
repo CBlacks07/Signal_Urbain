@@ -66,25 +66,30 @@ export class UsersController {
   @Roles(Role.ADMIN)
   updateAgent(
     @Param('id') id: string,
+    @CurrentUser() user: { communeId: string | null; role: Role },
     @Body() body: { name?: string; phone?: string; role?: Role; service?: string; communeId?: string; isActive?: boolean },
   ) {
-    return this.users.updateAgent(id, body);
+    return this.users.updateAgent(id, user, body);
   }
 
   @Post('agents/:id/reassign')
   @Roles(Role.ADMIN)
   reassignIncidents(
     @Param('id') id: string,
+    @CurrentUser() user: { communeId: string | null; role: Role },
     @Body() body: { toAgentId: string },
   ) {
-    return this.users.reassignIncidents(id, body.toAgentId);
+    return this.users.reassignIncidents(id, body.toAgentId, user);
   }
 
   @Delete('agents/:id')
   @Roles(Role.ADMIN)
   @HttpCode(HttpStatus.NO_CONTENT)
-  removeAgent(@Param('id') id: string) {
-    return this.users.removeAgent(id);
+  removeAgent(
+    @Param('id') id: string,
+    @CurrentUser() user: { communeId: string | null; role: Role },
+  ) {
+    return this.users.removeAgent(id, user);
   }
 
   // ─── Demandes de changement de commune (AGENT+) ──────────────────────────

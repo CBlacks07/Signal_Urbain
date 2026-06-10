@@ -50,9 +50,10 @@ export class IncidentsController {
     @Param('id') id: string,
     @CurrentUser('id') userId: string,
     @CurrentUser('role') role: Role,
+    @CurrentUser('communeId') communeId: string | null,
     @Body() dto: UpdateIncidentDto,
   ) {
-    return this.incidents.update(id, userId, role, dto);
+    return this.incidents.update(id, userId, role, communeId, dto);
   }
 
   @Post(':id/upvote')

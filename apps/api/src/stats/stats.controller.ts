@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Query, UseGuards, ForbiddenException } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -23,7 +23,14 @@ export class StatsController {
 
   @Get('commune/:id')
   @Roles(Role.AGENT)
-  getByCommune(@Param('id') id: string) {
-    return this.stats.getByCommune(id);
+  getByCommune(
+    @Param('id') id: string,
+    @CurrentUser('role') role: Role,
+    @CurrentUser('communeId') communeId: string | null,
+  ) {
+    // Seul le SUPER_ADMIN peut consulter les stats d'une autre commune que la sienne
+    const targetId = role === Role.SUPER_ADMIN ? id : communeId;
+    if (!targetId) throw new ForbiddenException('Aucune commune associée à votre compte');
+    return this.stats.getByCommune(targetId);
   }
 }
