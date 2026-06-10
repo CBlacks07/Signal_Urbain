@@ -3,11 +3,30 @@ import {
   LayoutDashboard, FileText, Map, Users, BarChart2, Settings,
   AlertTriangle, Clock, Activity, CheckCircle2, Search, MapPin,
   Building2, Calendar, MessageSquare, Building, Zap, X, Check,
-  ChevronRight, LogOut, ArrowUp, Image,
+  ChevronRight, LogOut, ArrowUp, Image, Download,
 } from "lucide-react";
 import axios from "axios";
 import { MapContainer, TileLayer, CircleMarker, Popup } from "react-leaflet";
 import { ToastHost, showError } from "./toast";
+
+// ─── UTILS ────────────────────────────────────────────────────────────────────
+
+function exportToCsv(filename: string, rows: Record<string, any>[]) {
+  if (rows.length === 0) return;
+  const headers = Object.keys(rows[0]);
+  const escape = (val: any) => `"${String(val ?? "").replace(/"/g, '""')}"`;
+  const csv = [
+    headers.map(escape).join(","),
+    ...rows.map(row => headers.map(h => escape(row[h])).join(",")),
+  ].join("\r\n");
+  const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 
@@ -284,7 +303,7 @@ function Sidebar({ active, onNav, collapsed, onToggle, onLogout, isSuperAdmin, m
 
       <div style={{ flex: 1, padding: "4px 8px" }}>
         {visibleNavItems.map(({ id, Icon, label }) => (
-          <button key={id} onClick={() => onNav(id)} style={{
+          <button key={id} onClick={() => onNav(id)} aria-label={label} aria-current={active === id ? "page" : undefined} style={{
             display: "flex", alignItems: "center", gap: 12, width: "100%",
             padding: collapsed ? "12px 0" : "11px 14px",
             justifyContent: collapsed ? "center" : "flex-start",
@@ -300,7 +319,7 @@ function Sidebar({ active, onNav, collapsed, onToggle, onLogout, isSuperAdmin, m
           <>
             {!collapsed && <div style={{ fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.25)", letterSpacing: "0.12em", textTransform: "uppercase", padding: "12px 14px 4px" }}>Administration</div>}
             {SA_NAV_ITEMS.map(({ id, Icon, label }) => (
-              <button key={id} onClick={() => onNav(id)} style={{
+              <button key={id} onClick={() => onNav(id)} aria-label={label} aria-current={active === id ? "page" : undefined} style={{
                 display: "flex", alignItems: "center", gap: 12, width: "100%",
                 padding: collapsed ? "12px 0" : "11px 14px",
                 justifyContent: collapsed ? "center" : "flex-start",
@@ -315,7 +334,7 @@ function Sidebar({ active, onNav, collapsed, onToggle, onLogout, isSuperAdmin, m
         )}
       </div>
 
-      <button onClick={onToggle} style={{ margin: 8, padding: 10, background: "rgba(255,255,255,0.06)", border: "none", borderRadius: 10, cursor: "pointer", color: "rgba(255,255,255,0.4)", fontSize: 14 }}>
+      <button onClick={onToggle} aria-label={collapsed ? "Agrandir le menu" : "Réduire le menu"} style={{ margin: 8, padding: 10, background: "rgba(255,255,255,0.06)", border: "none", borderRadius: 10, cursor: "pointer", color: "rgba(255,255,255,0.4)", fontSize: 14 }}>
         {collapsed ? "→" : "← Réduire"}
       </button>
 
@@ -327,7 +346,7 @@ function Sidebar({ active, onNav, collapsed, onToggle, onLogout, isSuperAdmin, m
               <div style={{ fontSize: 12.5, fontWeight: 700, color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{displayName}</div>
               <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>{displayRole}</div>
             </div>
-            <button onClick={() => setConfirmLogout(true)} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.35)", padding: 4, display: "flex" }}>
+            <button onClick={() => setConfirmLogout(true)} aria-label="Se déconnecter" style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.35)", padding: 4, display: "flex" }}>
               <LogOut size={15} />
             </button>
           </>
@@ -423,7 +442,7 @@ function TopBar({ token, me }: { token: string; me: any }) {
     <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", marginBottom: 28, gap: 12 }}>
       {/* Cloche notifications */}
       <div style={{ position: "relative" }}>
-        <button onClick={handleOpen} style={{
+        <button onClick={handleOpen} aria-label={`Notifications${unread > 0 ? ` (${unread} non lues)` : ""}`} style={{
           position: "relative", width: 40, height: 40, borderRadius: 12,
           background: open ? "#1A472A" : "#fff", border: "1px solid #ede9e3",
           cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
@@ -587,6 +606,7 @@ function IncidentsView({ reports, onOpenDetail }: any) {
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterPriority, setFilterPriority] = useState("all");
   const [sortBy, setSortBy] = useState("date");
+  const [page, setPage] = useState(1);
 
   const filtered = useMemo(() => {
     let list = [...reports];
@@ -608,29 +628,54 @@ function IncidentsView({ reports, onOpenDetail }: any) {
     return list;
   }, [reports, search, filterStatus, filterPriority, sortBy]);
 
+  useEffect(() => { setPage(1); }, [search, filterStatus, filterPriority, sortBy]);
+
+  const paged = useMemo(() => filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [filtered, page]);
+
   const sel: React.CSSProperties = { padding: "8px 12px", borderRadius: 10, border: "1.5px solid #e8e5e0", fontSize: 12, fontFamily: "inherit", background: "#fdfcfa", outline: "none", cursor: "pointer", color: "#555" };
+
+  const exportCsv = () => {
+    exportToCsv("incidents.csv", filtered.map((r: any) => ({
+      id: r.id,
+      description: r.desc,
+      adresse: r.address,
+      commune: r.commune,
+      categorie: CATEGORIES[r.category]?.label ?? r.category,
+      statut: STATUS[r.status]?.label ?? r.status,
+      priorite: PRIORITY[r.priority]?.label ?? r.priority,
+      votes: r.upvotes,
+      date: r.date,
+    })));
+  };
 
   return (
     <div style={{ animation: "fadeIn 0.4s ease" }}>
-      <div style={{ marginBottom: 20 }}>
-        <h1 style={{ fontSize: 26, fontWeight: 800, color: "#1a1a1a", margin: "0 0 4px", fontFamily: "'Outfit', sans-serif" }}>Incidents</h1>
-        <p style={{ fontSize: 13, color: "#999", margin: 0 }}>{filtered.length} signalement{filtered.length > 1 ? "s" : ""}</p>
+      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 20, gap: 12, flexWrap: "wrap" }}>
+        <div>
+          <h1 style={{ fontSize: 26, fontWeight: 800, color: "#1a1a1a", margin: "0 0 4px", fontFamily: "'Outfit', sans-serif" }}>Incidents</h1>
+          <p style={{ fontSize: 13, color: "#999", margin: 0 }}>{filtered.length} signalement{filtered.length > 1 ? "s" : ""}</p>
+        </div>
+        <button onClick={exportCsv} disabled={filtered.length === 0}
+          aria-label="Exporter les incidents en CSV"
+          style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", background: "#fff", border: "1.5px solid #e8e5e0", borderRadius: 10, fontSize: 12.5, fontWeight: 700, color: "#555", cursor: filtered.length === 0 ? "default" : "pointer", opacity: filtered.length === 0 ? 0.5 : 1 }}>
+          <Download size={14} /> Exporter CSV
+        </button>
       </div>
 
       <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
         <div style={{ position: "relative", flex: 1, maxWidth: 360 }}>
           <Search size={14} color="#aaa" style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)" }} />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher..." style={{ width: "100%", padding: "10px 14px 10px 38px", borderRadius: 12, border: "1.5px solid #e8e5e0", fontSize: 13, fontFamily: "inherit", background: "#fdfcfa", outline: "none" }} />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher..." aria-label="Rechercher un incident" style={{ width: "100%", padding: "10px 14px 10px 38px", borderRadius: 12, border: "1.5px solid #e8e5e0", fontSize: 13, fontFamily: "inherit", background: "#fdfcfa", outline: "none" }} />
         </div>
-        <select value={filterStatus}   onChange={e => setFilterStatus(e.target.value)}   style={sel}>
+        <select value={filterStatus}   onChange={e => setFilterStatus(e.target.value)}   style={sel} aria-label="Filtrer par statut">
           <option value="all">Tous les statuts</option>
           {Object.entries(STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
         </select>
-        <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)} style={sel}>
+        <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)} style={sel} aria-label="Filtrer par priorité">
           <option value="all">Toutes priorités</option>
           {Object.entries(PRIORITY).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
         </select>
-        <select value={sortBy}         onChange={e => setSortBy(e.target.value)}         style={sel}>
+        <select value={sortBy}         onChange={e => setSortBy(e.target.value)}         style={sel} aria-label="Trier les incidents">
           <option value="date">Par date</option>
           <option value="upvotes">Par soutiens</option>
           <option value="priority">Par priorité</option>
@@ -646,7 +691,7 @@ function IncidentsView({ reports, onOpenDetail }: any) {
 
         {filtered.length === 0 && <div style={{ padding: "48px 20px", textAlign: "center", color: "#bbb", fontSize: 13 }}>Aucun incident</div>}
 
-        {filtered.map((r: any, i: number) => {
+        {paged.map((r: any, i: number) => {
           const cat = CATEGORIES[r.category];
           const st  = STATUS[r.status];
           const pr  = PRIORITY[r.priority];
@@ -672,6 +717,7 @@ function IncidentsView({ reports, onOpenDetail }: any) {
         })}
         </div>
         </div>
+        <Pagination page={page} total={filtered.length} onChange={setPage} />
       </div>
     </div>
   );
@@ -744,7 +790,7 @@ function DetailPanel({ report, agents, onClose, onUpdateStatus, token, onRefresh
               {pr && <Pill color={pr.color} bg={pr.color + "18"}>{pr.label}</Pill>}
             </div>
           </div>
-          <button onClick={onClose} style={{ width: 36, height: 36, borderRadius: 10, background: "#f5f2ed", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <button onClick={onClose} aria-label="Fermer" style={{ width: 36, height: 36, borderRadius: 10, background: "#f5f2ed", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <X size={16} color="#666" />
           </button>
         </div>
@@ -971,6 +1017,10 @@ function EquipesView({ token, agents, reports, onOpenDetail, onRefresh, isAdmin,
   const [reviewing, setReviewing] = useState<string | null>(null);
   const [rejectingReq, setRejectingReq] = useState<any>(null);
   const [rejectNote, setRejectNote] = useState("");
+  const [confirmAction, setConfirmAction] = useState<{ title: string; message: string; confirmLabel?: string; danger?: boolean; run: () => void } | null>(null);
+  const [citoyensPage, setCitoyensPage] = useState(1);
+
+  useEffect(() => { setCitoyensPage(1); }, [search, tab]);
 
   useEffect(() => {
     apiClient(token).get("/communes").then(({ data }) => setCommunes(data ?? [])).catch(() => {});
@@ -1017,17 +1067,24 @@ function EquipesView({ token, agents, reports, onOpenDetail, onRefresh, isAdmin,
 
   useEffect(() => { if (tab === "citoyens") loadCitizens(); }, [tab, loadCitizens]);
 
-  const promoteToAgent = async (id: string, name: string) => {
-    if (!confirm(`Promouvoir ${name} au role Agent ?`)) return;
-    setPromoting(id);
-    try {
-      await apiClient(token).patch(`/users/agents/${id}`, { role: "AGENT" });
-      setCitizens(prev => prev.filter(c => c.id !== id));
-      onRefresh();
-    } catch {
-      showError(`Impossible de promouvoir ${name} au rôle Agent`);
-    }
-    finally { setPromoting(null); }
+  const promoteToAgent = (id: string, name: string) => {
+    setConfirmAction({
+      title: "Promouvoir en agent",
+      message: `Promouvoir ${name} au rôle Agent ?`,
+      confirmLabel: "Promouvoir",
+      danger: false,
+      run: async () => {
+        setPromoting(id);
+        try {
+          await apiClient(token).patch(`/users/agents/${id}`, { role: "AGENT" });
+          setCitizens(prev => prev.filter(c => c.id !== id));
+          onRefresh();
+        } catch {
+          showError(`Impossible de promouvoir ${name} au rôle Agent`);
+        }
+        finally { setPromoting(null); }
+      },
+    });
   };
 
   const createAgent = async () => {
@@ -1084,14 +1141,20 @@ function EquipesView({ token, agents, reports, onOpenDetail, onRefresh, isAdmin,
     removeAgent(agent.id, agent.name);
   };
 
-  const removeAgent = async (id: string, name: string) => {
-    if (!confirm(`Supprimer l'agent ${name} ?`)) return;
-    try {
-      await apiClient(token).delete(`/users/agents/${id}`);
-      onRefresh();
-    } catch (e: any) {
-      showError(e?.response?.data?.message ?? `Impossible de supprimer l'agent ${name}`);
-    }
+  const removeAgent = (id: string, name: string) => {
+    setConfirmAction({
+      title: "Supprimer l'agent",
+      message: `Supprimer l'agent ${name} ?`,
+      confirmLabel: "Supprimer",
+      run: async () => {
+        try {
+          await apiClient(token).delete(`/users/agents/${id}`);
+          onRefresh();
+        } catch (e: any) {
+          showError(e?.response?.data?.message ?? `Impossible de supprimer l'agent ${name}`);
+        }
+      },
+    });
   };
 
   const confirmReassignAndRemove = async () => {
@@ -1127,6 +1190,15 @@ function EquipesView({ token, agents, reports, onOpenDetail, onRefresh, isAdmin,
         {tab === "agents" && (
           <button onClick={() => setShowForm(v => !v)} style={{ padding: "10px 20px", background: "linear-gradient(135deg, #1A472A, #2B7A3E)", color: "#fff", border: "none", borderRadius: 12, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
             + Ajouter un agent
+          </button>
+        )}
+        {tab === "citoyens" && (
+          <button onClick={() => exportToCsv("citoyens.csv", filteredCitizens.map((c: any) => ({
+            nom: c.name, telephone: c.phone, commune: c.commune?.name ?? "",
+          })))} disabled={filteredCitizens.length === 0}
+            aria-label="Exporter les citoyens en CSV"
+            style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", background: "#fff", border: "1.5px solid #e8e5e0", borderRadius: 12, fontSize: 12.5, fontWeight: 700, color: "#555", cursor: filteredCitizens.length === 0 ? "default" : "pointer", opacity: filteredCitizens.length === 0 ? 0.5 : 1 }}>
+            <Download size={14} /> Exporter CSV
           </button>
         )}
       </div>
@@ -1304,13 +1376,13 @@ function EquipesView({ token, agents, reports, onOpenDetail, onRefresh, isAdmin,
                 <span></span>
               </div>
 
-              {filteredCitizens.map((c: any, idx: number) => {
+              {filteredCitizens.slice((citoyensPage - 1) * PAGE_SIZE, citoyensPage * PAGE_SIZE).map((c: any, idx: number, arr: any[]) => {
                 const initials = (c.name ?? "?").split(" ").map((w: string) => w[0]).slice(0, 2).join("").toUpperCase();
                 return (
                   <div key={c.id} style={{
                     display: "grid", gridTemplateColumns: "2fr 1fr 80px 80px 140px", gap: 12,
                     padding: "14px 20px", alignItems: "center",
-                    borderBottom: idx < filteredCitizens.length - 1 ? "1px solid #f5f2ed" : "none",
+                    borderBottom: idx < arr.length - 1 ? "1px solid #f5f2ed" : "none",
                     animation: "cardIn 0.3s ease",
                   }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
@@ -1352,6 +1424,7 @@ function EquipesView({ token, agents, reports, onOpenDetail, onRefresh, isAdmin,
               })}
             </div>
             </div>
+            <Pagination page={citoyensPage} total={filteredCitizens.length} onChange={setCitoyensPage} />
             </div>
           )}
         </div>
@@ -1527,6 +1600,17 @@ function EquipesView({ token, agents, reports, onOpenDetail, onRefresh, isAdmin,
           </div>
         </Modal>
       )}
+
+      {confirmAction && (
+        <ConfirmModal
+          title={confirmAction.title}
+          message={confirmAction.message}
+          confirmLabel={confirmAction.confirmLabel}
+          danger={confirmAction.danger}
+          onConfirm={confirmAction.run}
+          onClose={() => setConfirmAction(null)}
+        />
+      )}
     </div>
   );
 }
@@ -1599,13 +1683,53 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
       <div style={{ position: "relative", background: "#fff", borderRadius: 20, padding: 32, width: 440, maxWidth: "90vw", boxShadow: "0 24px 60px rgba(0,0,0,0.18)", animation: "cardIn 0.25s ease" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
           <div style={{ fontSize: 16, fontWeight: 800, color: "#1a1a1a" }}>{title}</div>
-          <button onClick={onClose} style={{ width: 32, height: 32, borderRadius: 8, background: "#f5f2ed", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <button onClick={onClose} aria-label="Fermer" style={{ width: 32, height: 32, borderRadius: 8, background: "#f5f2ed", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <X size={14} color="#666" />
           </button>
         </div>
         {children}
       </div>
     </div>
+  );
+}
+
+const PAGE_SIZE = 20;
+
+function Pagination({ page, total, pageSize = PAGE_SIZE, onChange }: { page: number; total: number; pageSize?: number; onChange: (page: number) => void }) {
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  if (totalPages <= 1) return null;
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12, padding: "16px 20px" }}>
+      <button onClick={() => onChange(page - 1)} disabled={page <= 1} aria-label="Page précédente"
+        style={{ padding: "6px 14px", borderRadius: 8, border: "1.5px solid #e8e5e0", background: "#fff", fontSize: 12, fontWeight: 700, color: "#555", cursor: page <= 1 ? "default" : "pointer", opacity: page <= 1 ? 0.4 : 1 }}>
+        Précédent
+      </button>
+      <span style={{ fontSize: 12, color: "#888" }}>Page {page} / {totalPages}</span>
+      <button onClick={() => onChange(page + 1)} disabled={page >= totalPages} aria-label="Page suivante"
+        style={{ padding: "6px 14px", borderRadius: 8, border: "1.5px solid #e8e5e0", background: "#fff", fontSize: 12, fontWeight: 700, color: "#555", cursor: page >= totalPages ? "default" : "pointer", opacity: page >= totalPages ? 0.4 : 1 }}>
+        Suivant
+      </button>
+    </div>
+  );
+}
+
+function ConfirmModal({ title, message, confirmLabel = "Confirmer", danger = true, onConfirm, onClose }: {
+  title: string; message: string; confirmLabel?: string; danger?: boolean; onConfirm: () => void; onClose: () => void;
+}) {
+  return (
+    <Modal title={title} onClose={onClose}>
+      <p style={{ fontSize: 14, color: "#555", lineHeight: 1.6, margin: "0 0 20px" }}>{message}</p>
+      <div style={{ display: "flex", gap: 10 }}>
+        <button onClick={() => { onConfirm(); onClose(); }}
+          style={{ flex: 1, padding: 12, background: danger ? "#C62828" : "#1A472A", color: "#fff", border: "none", borderRadius: 12, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+          {confirmLabel}
+        </button>
+        <button onClick={onClose}
+          style={{ flex: 1, padding: 12, background: "#f5f2ed", color: "#666", border: "none", borderRadius: 12, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+          Annuler
+        </button>
+      </div>
+    </Modal>
   );
 }
 
@@ -1893,6 +2017,7 @@ function CommunesAdminView({ token }: any) {
   const [editForm, setEditForm]     = useState<any>(null);
   const [editError, setEditError]   = useState("");
   const [editSaving, setEditSaving] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState<{ id: string; name: string } | null>(null);
 
   const load = async () => {
     try { const { data } = await apiClient(token).get("/admin/communes"); setCommunes(data); }
@@ -1910,8 +2035,7 @@ function CommunesAdminView({ token }: any) {
     } catch (e: any) { setErr(e?.response?.data?.message ?? "Erreur"); }
   };
 
-  const remove = async (id: string, name: string) => {
-    if (!confirm(`Supprimer la commune "${name}" ?`)) return;
+  const remove = async (id: string) => {
     try { await apiClient(token).delete(`/admin/communes/${id}`); load(); }
     catch { setErr("Impossible de supprimer (des utilisateurs sont liés)"); }
   };
@@ -1990,7 +2114,7 @@ function CommunesAdminView({ token }: any) {
                 <button onClick={() => openEdit(c)} style={{ background: "#E8F0EA", border: "none", borderRadius: 8, padding: "4px 10px", fontSize: 11, color: "#1A472A", fontWeight: 700, cursor: "pointer" }}>
                   Modifier
                 </button>
-                <button onClick={() => remove(c.id, c.name)} style={{ background: "#FFEBEE", border: "none", borderRadius: 8, padding: "4px 10px", fontSize: 11, color: "#C62828", fontWeight: 700, cursor: "pointer" }}>
+                <button onClick={() => setConfirmRemove({ id: c.id, name: c.name })} style={{ background: "#FFEBEE", border: "none", borderRadius: 8, padding: "4px 10px", fontSize: 11, color: "#C62828", fontWeight: 700, cursor: "pointer" }}>
                   Supprimer
                 </button>
               </div>
@@ -2041,6 +2165,16 @@ function CommunesAdminView({ token }: any) {
           </div>
         </Modal>
       )}
+
+      {confirmRemove && (
+        <ConfirmModal
+          title="Supprimer la commune"
+          message={`Supprimer la commune "${confirmRemove.name}" ?`}
+          confirmLabel="Supprimer"
+          onConfirm={() => remove(confirmRemove.id)}
+          onClose={() => setConfirmRemove(null)}
+        />
+      )}
     </div>
   );
 }
@@ -2060,6 +2194,8 @@ function UsersAdminView({ token }: any) {
   const [loading, setLoading]   = useState(true);
   const [roleFilter, setRoleFilter] = useState("all");
   const [err, setErr]           = useState("");
+  const [confirmRemove, setConfirmRemove] = useState<{ id: string; name: string } | null>(null);
+  const [page, setPage]         = useState(1);
 
   const load = async () => {
     setLoading(true);
@@ -2072,6 +2208,7 @@ function UsersAdminView({ token }: any) {
   };
 
   useEffect(() => { load(); }, [roleFilter]);
+  useEffect(() => { setPage(1); }, [roleFilter]);
   useEffect(() => {
     apiClient(token).get("/admin/communes").then(({ data }) => setCommunes(data ?? [])).catch(() => {});
   }, [token]);
@@ -2086,22 +2223,35 @@ function UsersAdminView({ token }: any) {
     catch { setErr("Impossible de changer la commune"); }
   };
 
-  const remove = async (id: string, name: string) => {
-    if (!confirm(`Supprimer "${name}" ?`)) return;
+  const remove = async (id: string) => {
     try { await apiClient(token).delete(`/admin/users/${id}`); load(); }
     catch { setErr("Impossible de supprimer"); }
   };
 
   const ROLES = ["all", "CITIZEN", "AGENT", "ADMIN", "SUPER_ADMIN"];
 
+  const exportCsv = () => {
+    exportToCsv("utilisateurs.csv", users.map((u: any) => ({
+      nom: u.name,
+      telephone: u.phone,
+      role: ROLE_LABELS[u.role]?.label ?? u.role,
+      commune: u.commune?.name ?? "",
+    })));
+  };
+
   return (
     <div style={{ animation: "cardIn 0.4s ease both" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, gap: 12, flexWrap: "wrap" }}>
         <div>
           <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>Utilisateurs</h2>
           <p style={{ margin: "4px 0 0", color: "#888", fontSize: 13 }}>{users.length} utilisateurs</p>
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <button onClick={exportCsv} disabled={users.length === 0}
+            aria-label="Exporter les utilisateurs en CSV"
+            style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", background: "#fff", border: "1.5px solid #e8e5e0", borderRadius: 20, fontSize: 12, fontWeight: 700, color: "#555", cursor: users.length === 0 ? "default" : "pointer", opacity: users.length === 0 ? 0.5 : 1 }}>
+            <Download size={13} /> Exporter CSV
+          </button>
           {ROLES.map(r => (
             <button key={r} onClick={() => setRoleFilter(r)}
               style={{ padding: "7px 14px", borderRadius: 20, border: "none", cursor: "pointer", fontSize: 12, fontWeight: 700,
@@ -2115,10 +2265,10 @@ function UsersAdminView({ token }: any) {
       {err && <p style={{ color: "#C62828", fontSize: 12, marginBottom: 12 }}>{err}</p>}
       {loading ? <div style={{ color: "#bbb", padding: 20 }}>Chargement...</div> : (
         <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #ede9e3", overflow: "hidden" }}>
-          {users.map((u: any, i: number) => {
+          {users.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((u: any, i: number, arr: any[]) => {
             const rl = ROLE_LABELS[u.role] ?? ROLE_LABELS.CITIZEN;
             return (
-              <div key={u.id} style={{ display: "flex", alignItems: "center", padding: "14px 18px", borderBottom: i < users.length - 1 ? "1px solid #f5f2ed" : "none", gap: 14 }}>
+              <div key={u.id} style={{ display: "flex", alignItems: "center", padding: "14px 18px", borderBottom: i < arr.length - 1 ? "1px solid #f5f2ed" : "none", gap: 14 }}>
                 <div style={{ width: 38, height: 38, borderRadius: "50%", background: "#f5f2ed", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 14, color: "#1A472A", flexShrink: 0 }}>
                   {u.name?.charAt(0).toUpperCase()}
                 </div>
@@ -2139,14 +2289,25 @@ function UsersAdminView({ token }: any) {
                   {Object.keys(ROLE_LABELS).map(r => <option key={r} value={r}>{ROLE_LABELS[r].label}</option>)}
                 </select>
                 {u.role !== "SUPER_ADMIN" && (
-                  <button onClick={() => remove(u.id, u.name)} style={{ background: "#FFEBEE", border: "none", borderRadius: 8, padding: "5px 10px", fontSize: 11, color: "#C62828", fontWeight: 700, cursor: "pointer" }}>
+                  <button onClick={() => setConfirmRemove({ id: u.id, name: u.name })} style={{ background: "#FFEBEE", border: "none", borderRadius: 8, padding: "5px 10px", fontSize: 11, color: "#C62828", fontWeight: 700, cursor: "pointer" }}>
                     Suppr.
                   </button>
                 )}
               </div>
             );
           })}
+          <Pagination page={page} total={users.length} onChange={setPage} />
         </div>
+      )}
+
+      {confirmRemove && (
+        <ConfirmModal
+          title="Supprimer l'utilisateur"
+          message={`Supprimer "${confirmRemove.name}" ?`}
+          confirmLabel="Supprimer"
+          onConfirm={() => remove(confirmRemove.id)}
+          onClose={() => setConfirmRemove(null)}
+        />
       )}
     </div>
   );
