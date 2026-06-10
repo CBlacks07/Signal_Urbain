@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   ScrollView, ScrollViewProps, Keyboard, TextInput, Platform,
-  findNodeHandle, NativeSyntheticEvent, NativeScrollEvent, LayoutChangeEvent,
+  findNodeHandle, NativeSyntheticEvent, NativeScrollEvent, LayoutChangeEvent, Dimensions,
 } from 'react-native';
 
 /**
@@ -38,7 +38,9 @@ export function KeyboardAwareScrollView({
         // Sur iOS le clavier recouvre la ScrollView -> on retire sa hauteur.
         // Sur Android (adjustResize) la ScrollView est déjà réduite -> rien à retirer.
         const overlay = Platform.OS === 'ios' ? kbHeightRef.current : 0;
-        const visibleBottom = viewportH.current - overlay;
+        // Repli si la ScrollView n'a pas encore été mesurée (clavier ouvert au montage).
+        const vp = viewportH.current || Dimensions.get('window').height;
+        const visibleBottom = vp - overlay;
         const fieldBottom = y + h + extraOffset;
 
         if (fieldBottom > visibleBottom) {

@@ -187,9 +187,11 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
   container:  { flex: 1, backgroundColor: '#EDECEA' },
-  inner:      { flexGrow: 1, justifyContent: 'center', padding: 24 },
-  logoWrap:   { alignItems: 'center', marginBottom: 32 },
-  logoImage:  { width: 160, height: 160 },
+  // Contenu aligné en haut (pas centré) : les champs restent hauts sur l'écran,
+  // le clavier ne peut donc pas les recouvrir.
+  inner:      { flexGrow: 1, justifyContent: 'flex-start', padding: 24, paddingTop: 56 },
+  logoWrap:   { alignItems: 'center', marginBottom: 24 },
+  logoImage:  { width: 130, height: 130 },
   card:       { backgroundColor: '#fff', borderRadius: 24, padding: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 16, elevation: 6 },
   cardTitle:  { fontSize: 20, fontWeight: '800', color: '#1A1A1A', marginBottom: 4 },
   cardSub:    { fontSize: 13, color: '#999', marginBottom: 20 },
