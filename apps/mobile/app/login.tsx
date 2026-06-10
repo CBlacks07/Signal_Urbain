@@ -5,13 +5,15 @@ import { apiClient, saveToken, getToken, API_BASE } from '../lib/api';
 import { COLORS } from '../lib/theme';
 
 export default function LoginScreen() {
-  const [step, setStep]           = useState<'phone' | 'otp' | 'name'>('phone');
+  const [step, setStep]           = useState<'phone' | 'otp' | 'name' | 'commune'>('phone');
   const [phone, setPhone]         = useState('');
   const [otp, setOtp]             = useState('');
   const [name, setName]           = useState('');
   const [loading, setLoading]     = useState(false);
   const [error, setError]         = useState('');
   const [debugCode, setDebugCode] = useState('');
+  const [communes, setCommunes]   = useState<{ id: string; name: string }[]>([]);
+  const [communeId, setCommuneId] = useState('');
 
   const requestOtp = async () => {
     if (!phone.trim()) { setError('Entrez votre numéro de téléphone'); return; }
@@ -25,6 +27,14 @@ export default function LoginScreen() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Charge la liste des communes (route publique) pour l'etape de selection
+  const loadCommunes = async () => {
+    try {
+      const res = await apiClient().get('/communes');
+      setCommunes(res.data ?? []);
+    } catch { /* on laissera l'utilisateur reessayer */ }
   };
 
   const verifyOtp = async () => {
@@ -51,9 +61,24 @@ export default function LoginScreen() {
     try {
       const token = await getToken();
       await apiClient(token).patch('/users/me', { name: name.trim() });
-      router.replace('/(tabs)');
+      await loadCommunes();
+      setStep('commune');
     } catch (e: any) {
       setError(e?.response?.data?.message ?? "Impossible d'enregistrer votre nom.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const submitCommune = async () => {
+    if (!communeId) { setError('Sélectionnez votre commune'); return; }
+    setLoading(true); setError('');
+    try {
+      const token = await getToken();
+      await apiClient(token).patch('/users/me', { communeId });
+      router.replace('/(tabs)');
+    } catch (e: any) {
+      setError(e?.response?.data?.message ?? "Impossible d'enregistrer votre commune.");
     } finally {
       setLoading(false);
     }
@@ -74,7 +99,31 @@ export default function LoginScreen() {
 
         {/* Card */}
         <View style={styles.card}>
-          {step === 'name' ? (
+          {step === 'commune' ? (
+            <>
+              <Text style={styles.cardTitle}>Votre commune</Text>
+              <Text style={styles.cardSub}>Choisissez votre commune pour voir les signalements de votre quartier.</Text>
+              <Text style={styles.label}>COMMUNE</Text>
+              <View style={styles.communeList}>
+                {communes.length === 0 ? (
+                  <ActivityIndicator color={COLORS.dark} style={{ marginVertical: 16 }} />
+                ) : communes.map(c => (
+                  <TouchableOpacity
+                    key={c.id}
+                    onPress={() => { setCommuneId(c.id); setError(''); }}
+                    style={[styles.communeChip, communeId === c.id && styles.communeChipActive]}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.communeChipText, communeId === c.id && styles.communeChipTextActive]}>{c.name}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              {error ? <Text style={styles.error}>{error}</Text> : null}
+              <TouchableOpacity style={[styles.btn, !communeId && styles.btnDisabled]} onPress={submitCommune} disabled={loading || !communeId}>
+                {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Terminer</Text>}
+              </TouchableOpacity>
+            </>
+          ) : step === 'name' ? (
             <>
               <Text style={styles.cardTitle}>Bienvenue !</Text>
               <Text style={styles.cardSub}>Comment souhaitez-vous être identifié ?</Text>
@@ -154,7 +203,13 @@ const styles = StyleSheet.create({
   error:      { fontSize: 12, color: '#C62828', marginBottom: 10 },
   debugCode:  { fontSize: 12, color: COLORS.dark, backgroundColor: '#E8F5E9', padding: 10, borderRadius: 10, marginBottom: 12, textAlign: 'center', fontWeight: '700' },
   btn:        { backgroundColor: COLORS.dark, borderRadius: 14, padding: 15, alignItems: 'center', marginTop: 8 },
+  btnDisabled:{ backgroundColor: '#C8C5BF' },
   btnText:    { color: '#fff', fontSize: 15, fontWeight: '700' },
   backBtn:    { padding: 12, alignItems: 'center' },
   backText:   { fontSize: 13, color: '#999' },
+  communeList:    { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
+  communeChip:    { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20, backgroundColor: '#faf9f7', borderWidth: 1.5, borderColor: '#e8e5e0' },
+  communeChipActive: { backgroundColor: COLORS.dark, borderColor: COLORS.dark },
+  communeChipText:   { fontSize: 13, fontWeight: '600', color: '#666' },
+  communeChipTextActive: { color: '#fff' },
 });
