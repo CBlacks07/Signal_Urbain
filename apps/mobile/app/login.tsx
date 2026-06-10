@@ -2,8 +2,7 @@ import { useState, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, Image, ScrollView } from 'react-native';
 import { router } from 'expo-router';
 import { apiClient, saveToken, getToken, API_BASE } from '../lib/api';
-
-const COLORS = { dark: '#1A472A', bg: '#FDFCFA' };
+import { COLORS } from '../lib/theme';
 
 export default function LoginScreen() {
   const [step, setStep]           = useState<'phone' | 'otp' | 'name'>('phone');

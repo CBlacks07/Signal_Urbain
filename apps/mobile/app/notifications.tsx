@@ -2,8 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native';
 import { router } from 'expo-router';
 import { apiClient, getToken } from '../lib/api';
-
-const COLORS = { dark: '#1A472A', orange: '#D4760A', bg: '#F5F4F2' };
+import { COLORS } from '../lib/theme';
 
 const NOTIF_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
   STATUS_UPDATE: { label: "Mise a jour",    color: "#2B7A9B", bg: "#E0F2F1" },

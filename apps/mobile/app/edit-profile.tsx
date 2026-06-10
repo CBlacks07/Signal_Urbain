@@ -5,8 +5,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { apiClient, getToken } from '../lib/api';
-
-const COLORS = { dark: '#1A472A', orange: '#D4760A', bg: '#F5F4F2' };
+import { COLORS } from '../lib/theme';
 
 export default function EditProfileScreen() {
   const [me, setMe]           = useState<any>(null);

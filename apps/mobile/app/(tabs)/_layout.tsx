@@ -1,8 +1,7 @@
 import { Tabs } from 'expo-router';
 import { View, Text, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-const COLORS = { dark: '#1A472A', orange: '#D4760A' };
+import { COLORS } from '../../lib/theme';
 
 // Icones SVG-like dessinees avec des View/Text purs (pas d'emoji)
 function HomeIcon({ color, size = 22 }: { color: string; size?: number }) {

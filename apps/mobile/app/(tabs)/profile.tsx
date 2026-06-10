@@ -2,8 +2,7 @@ import { useState, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, ScrollView } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { apiClient, getToken, clearToken } from '../../lib/api';
-
-const COLORS = { dark: '#1A472A', orange: '#D4760A', bg: '#F5F4F2' };
+import { COLORS } from '../../lib/theme';
 
 const ROLE_LABELS: Record<string, string> = {
   CITIZEN: 'Citoyen',

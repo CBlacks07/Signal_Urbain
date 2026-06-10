@@ -2,8 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { apiClient, getToken } from '../../lib/api';
-
-const COLORS = { dark: '#1A472A', orange: '#D4760A', bg: '#FDFCFA' };
+import { COLORS } from '../../lib/theme';
 
 const CATEGORIES: Record<string, { label: string; color: string }> = {
   inondation: { label: "Inondation",         color: "#2B7A9B" },
@@ -100,7 +99,7 @@ export default function IncidentDetailScreen() {
   };
 
   if (loading) return (
-    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.bg }}>
+    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.bgLight }}>
       <ActivityIndicator size="large" color={COLORS.dark} />
     </View>
   );
@@ -202,7 +201,7 @@ export default function IncidentDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  container:       { flex: 1, backgroundColor: COLORS.bg },
+  container:       { flex: 1, backgroundColor: COLORS.bgLight },
   header:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, paddingTop: 52, backgroundColor: COLORS.dark },
   backBtn:         { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' },
   headerRef:       { fontSize: 14, fontWeight: '700', color: '#fff', letterSpacing: 0.5 },

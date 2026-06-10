@@ -2,8 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native';
 import { router } from 'expo-router';
 import { apiClient, getToken, normalizeStatus } from '../../lib/api';
-
-const COLORS = { dark: '#1A472A', orange: '#D4760A', bg: '#F5F4F2' };
+import { COLORS } from '../../lib/theme';
 
 const CATEGORIES: Record<string, { label: string; color: string; icon: string }> = {
   inondation: { label: "Inondation",        color: "#2B7A9B", icon: "~" },

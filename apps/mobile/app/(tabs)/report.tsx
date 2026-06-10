@@ -4,8 +4,7 @@ import { router } from 'expo-router';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
 import { apiClient, getToken, API_BASE } from '../../lib/api';
-
-const COLORS = { dark: '#1A472A', orange: '#D4760A', bg: '#F5F4F2' };
+import { COLORS } from '../../lib/theme';
 
 const CATEGORIES = [
   { id: "inondation", label: "Inondation",        color: "#2B7A9B" },
@@ -38,6 +37,7 @@ export default function ReportScreen() {
   const [longitude, setLongitude]   = useState<number | null>(null);
   const [locating, setLocating]     = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState('');
   const [photos, setPhotos]         = useState<string[]>([]); // URIs locales
 
   const pickPhoto = async () => {
@@ -84,8 +84,10 @@ export default function ReportScreen() {
         setAddress('Position GPS detectee');
       }
     } catch {
-      setAddress('Position GPS detectee');
-      setLatitude(6.1375); setLongitude(1.2123);
+      Alert.alert(
+        'Localisation impossible',
+        "Nous n'avons pas pu détecter votre position GPS. Merci de saisir une adresse précise ci-dessous."
+      );
     } finally {
       setLocating(false);
     }
@@ -94,33 +96,47 @@ export default function ReportScreen() {
   const handleSubmit = async () => {
     if (!category || !description || (!address.trim() && !commune)) return;
     setSubmitting(true);
+    setUploadStatus('');
     try {
       const token = await getToken();
       const communesRes = await apiClient(token).get('/communes');
       const communeData = (communesRes.data ?? []).find((c: any) => c.name === commune);
+
+      // Si le GPS n'a pas pu etre utilise, on tente de localiser l'adresse saisie
+      let lat = latitude;
+      let lng = longitude;
+      if (lat == null || lng == null) {
+        try {
+          const [geo] = await Location.geocodeAsync(`${address || commune}, ${commune}, Togo`);
+          if (geo) { lat = geo.latitude; lng = geo.longitude; }
+        } catch { /* geocodage indisponible */ }
+      }
+
       const incidentRes = await apiClient(token).post('/incidents', {
         category,
         description,
         address: address || commune,
-        latitude:  latitude  ?? 6.1375,
-        longitude: longitude ?? 1.2123,
+        latitude:  lat ?? 6.1375,
+        longitude: lng ?? 1.2123,
         communeId: communeData?.id,
       });
 
       // Upload des photos si presentes
       if (photos.length > 0 && incidentRes.data?.id) {
         const incidentId = incidentRes.data.id;
-        for (const uri of photos) {
+        for (let i = 0; i < photos.length; i++) {
+          setUploadStatus(`Envoi de la photo ${i + 1}/${photos.length}...`);
           try {
             const formData = new FormData();
-            const filename = uri.split('/').pop() ?? 'photo.jpg';
-            formData.append('file', { uri, name: filename, type: 'image/jpeg' } as any);
+            const filename = photos[i].split('/').pop() ?? 'photo.jpg';
+            formData.append('file', { uri: photos[i], name: filename, type: 'image/jpeg' } as any);
             formData.append('incidentId', incidentId);
             await apiClient(token).post('/uploads/photo', formData, {
               headers: { 'Content-Type': 'multipart/form-data' },
             });
           } catch { /* photo non critique */ }
         }
+        setUploadStatus('');
       }
       Alert.alert(
         'Signalement envoye',
@@ -135,6 +151,7 @@ export default function ReportScreen() {
       Alert.alert('Erreur', e?.response?.data?.message ?? "Impossible d'envoyer le signalement.");
     } finally {
       setSubmitting(false);
+      setUploadStatus('');
     }
   };
 
@@ -148,6 +165,8 @@ export default function ReportScreen() {
           onPress={() => step > 1 ? setStep(step - 1) : router.back()}
           style={styles.backBtn}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityRole="button"
+          accessibilityLabel="Retour"
         >
           <View style={styles.backArrow} />
         </TouchableOpacity>
@@ -232,13 +251,25 @@ export default function ReportScreen() {
               {photos.map(uri => (
                 <View key={uri} style={styles.photoThumb}>
                   <Image source={{ uri }} style={styles.photoImg} />
-                  <TouchableOpacity onPress={() => removePhoto(uri)} style={styles.photoRemove}>
+                  <TouchableOpacity
+                    onPress={() => removePhoto(uri)}
+                    style={styles.photoRemove}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    accessibilityRole="button"
+                    accessibilityLabel="Supprimer la photo"
+                  >
                     <Text style={styles.photoRemoveText}>x</Text>
                   </TouchableOpacity>
                 </View>
               ))}
               {photos.length < 3 && (
-                <TouchableOpacity onPress={pickPhoto} style={styles.photoAdd} activeOpacity={0.7}>
+                <TouchableOpacity
+                  onPress={pickPhoto}
+                  style={styles.photoAdd}
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel="Ajouter une photo"
+                >
                   <Text style={styles.photoAddIcon}>+</Text>
                   <Text style={styles.photoAddText}>Ajouter</Text>
                 </TouchableOpacity>
@@ -268,6 +299,8 @@ export default function ReportScreen() {
               disabled={locating}
               style={[styles.gpsBtn, latitude && styles.gpsBtnSuccess]}
               activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={latitude ? 'Position GPS obtenue' : 'Détecter ma position GPS'}
             >
               {locating ? (
                 <ActivityIndicator color={COLORS.dark} size="small" />
@@ -327,9 +360,16 @@ export default function ReportScreen() {
               disabled={submitting || (!address.trim() && !commune)}
               style={[styles.btnSubmit, (submitting || (!address.trim() && !commune)) && styles.btnDisabled]}
               activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel="Envoyer le signalement"
             >
               {submitting
-                ? <ActivityIndicator color="#fff" />
+                ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <ActivityIndicator color="#fff" />
+                    {uploadStatus ? <Text style={styles.btnText}>{uploadStatus}</Text> : null}
+                  </View>
+                )
                 : <Text style={styles.btnText}>Envoyer le signalement</Text>
               }
             </TouchableOpacity>
