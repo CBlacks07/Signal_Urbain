@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, TextInput } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, TextInput } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { apiClient, getToken } from '../../lib/api';
 import { COLORS } from '../../lib/theme';
+import { KeyboardAwareScrollView } from '../../components/KeyboardAwareScrollView';
 
 const CATEGORIES: Record<string, { label: string; color: string }> = {
   inondation: { label: "Inondation",         color: "#2B7A9B" },
@@ -121,12 +122,7 @@ export default function IncidentDetailScreen() {
         <View style={{ width: 36 }} />
       </View>
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-        automaticallyAdjustKeyboardInsets
-        contentContainerStyle={{ paddingBottom: 24 }}
-      >
+      <KeyboardAwareScrollView>
         {/* Hero */}
         <View style={[styles.hero, { backgroundColor: cat.color }]}>
           <View style={styles.heroBadges}>
@@ -200,7 +196,7 @@ export default function IncidentDetailScreen() {
             ))}
           </View>
         </View>
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </View>
   );
 }

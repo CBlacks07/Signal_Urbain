@@ -5,6 +5,7 @@ import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
 import { apiClient, getToken, API_BASE } from '../../lib/api';
 import { COLORS } from '../../lib/theme';
+import { KeyboardAwareScrollView } from '../../components/KeyboardAwareScrollView';
 
 const CATEGORIES = [
   { id: "inondation", label: "Inondation",        color: "#2B7A9B" },
@@ -195,13 +196,7 @@ export default function ReportScreen() {
         ))}
       </View>
 
-      <ScrollView
-        style={styles.content}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-        automaticallyAdjustKeyboardInsets
-        contentContainerStyle={{ paddingBottom: 24 }}
-      >
+      <KeyboardAwareScrollView style={styles.content}>
 
         {/* ETAPE 1 — Categorie */}
         {step === 1 && (
@@ -383,7 +378,7 @@ export default function ReportScreen() {
         )}
 
         <View style={{ height: 40 }} />
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </View>
   );
 }

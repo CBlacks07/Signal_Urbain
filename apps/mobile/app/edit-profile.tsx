@@ -6,6 +6,7 @@ import {
 import { router } from 'expo-router';
 import { apiClient, getToken } from '../lib/api';
 import { COLORS } from '../lib/theme';
+import { KeyboardAwareScrollView } from '../components/KeyboardAwareScrollView';
 
 export default function EditProfileScreen() {
   const [me, setMe]           = useState<any>(null);
@@ -110,12 +111,7 @@ export default function EditProfileScreen() {
           </TouchableOpacity>
         </View>
 
-        <ScrollView
-          style={styles.body}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-          automaticallyAdjustKeyboardInsets
-        >
+        <KeyboardAwareScrollView style={styles.body}>
           {/* Avatar */}
           <View style={styles.avatarSection}>
             <View style={styles.avatar}>
@@ -239,7 +235,7 @@ export default function EditProfileScreen() {
           )}
 
           <View style={{ height: 40 }} />
-        </ScrollView>
+        </KeyboardAwareScrollView>
       </View>
     </View>
   );

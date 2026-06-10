@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Image, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Image } from 'react-native';
 import { router } from 'expo-router';
 import { apiClient, saveToken, getToken, API_BASE } from '../lib/api';
 import { COLORS } from '../lib/theme';
+import { KeyboardAwareScrollView } from '../components/KeyboardAwareScrollView';
 
 export default function LoginScreen() {
   const [step, setStep]           = useState<'phone' | 'otp' | 'name' | 'commune'>('phone');
@@ -86,12 +87,7 @@ export default function LoginScreen() {
 
   return (
     <View style={styles.container}>
-      <ScrollView
-        contentContainerStyle={styles.inner}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-        automaticallyAdjustKeyboardInsets
-      >
+      <KeyboardAwareScrollView contentContainerStyle={styles.inner}>
         {/* Logo */}
         <View style={styles.logoWrap}>
           <Image source={require('../assets/icon.png')} style={styles.logoImage} resizeMode="contain" />
@@ -184,7 +180,7 @@ export default function LoginScreen() {
             </>
           )}
         </View>
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </View>
   );
 }
