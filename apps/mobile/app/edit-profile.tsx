@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ActivityIndicator, Alert, ScrollView, KeyboardAvoidingView, Platform,
+  ActivityIndicator, Alert, ScrollView,
 } from 'react-native';
 import { router } from 'expo-router';
 import { apiClient, getToken } from '../lib/api';
@@ -90,7 +90,7 @@ export default function EditProfileScreen() {
   const hasChanges = name !== (me?.name ?? '') || email !== (me?.email ?? '') || communeId !== (me?.communeId ?? '');
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+    <View style={{ flex: 1 }}>
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
@@ -110,7 +110,12 @@ export default function EditProfileScreen() {
           </TouchableOpacity>
         </View>
 
-        <ScrollView style={styles.body} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          style={styles.body}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets
+        >
           {/* Avatar */}
           <View style={styles.avatarSection}>
             <View style={styles.avatar}>
@@ -236,7 +241,7 @@ export default function EditProfileScreen() {
           <View style={{ height: 40 }} />
         </ScrollView>
       </View>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
