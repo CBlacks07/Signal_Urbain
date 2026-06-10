@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, Image, ScrollView } from 'react-native';
 import { router } from 'expo-router';
 import { apiClient, saveToken, getToken, API_BASE } from '../lib/api';
@@ -13,6 +13,13 @@ export default function LoginScreen() {
   const [loading, setLoading]     = useState(false);
   const [error, setError]         = useState('');
   const [debugCode, setDebugCode] = useState('');
+  const scrollRef = useRef<ScrollView>(null);
+
+  const scrollToInput = () => {
+    requestAnimationFrame(() => {
+      scrollRef.current?.scrollTo({ y: 250, animated: true });
+    });
+  };
 
   const requestOtp = async () => {
     if (!phone.trim()) { setError('Entrez votre numéro de téléphone'); return; }
@@ -63,6 +70,7 @@ export default function LoginScreen() {
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={styles.inner}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
@@ -86,6 +94,7 @@ export default function LoginScreen() {
                 placeholder="Ex: Komi Agbeko"
                 autoCapitalize="words"
                 autoFocus
+                onFocus={scrollToInput}
               />
               {error ? <Text style={styles.error}>{error}</Text> : null}
               <TouchableOpacity style={styles.btn} onPress={submitName} disabled={loading}>
@@ -104,6 +113,7 @@ export default function LoginScreen() {
                 placeholder="+228 90 00 00 00"
                 keyboardType="phone-pad"
                 autoFocus
+                onFocus={scrollToInput}
               />
               {error ? <Text style={styles.error}>{error}</Text> : null}
               <TouchableOpacity style={styles.btn} onPress={requestOtp} disabled={loading}>
@@ -124,6 +134,7 @@ export default function LoginScreen() {
                 keyboardType="number-pad"
                 maxLength={6}
                 autoFocus
+                onFocus={scrollToInput}
               />
               {error ? <Text style={styles.error}>{error}</Text> : null}
               <TouchableOpacity style={styles.btn} onPress={verifyOtp} disabled={loading}>
