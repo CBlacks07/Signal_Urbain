@@ -3,6 +3,7 @@ import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet, ActivityIn
 import { router } from 'expo-router';
 import { apiClient, getToken, normalizeStatus } from '../../lib/api';
 import { COLORS } from '../../lib/theme';
+import { IncidentListSkeleton } from '../../components/Skeleton';
 
 const CATEGORIES: Record<string, { label: string; color: string; icon: string }> = {
   inondation: { label: "Inondation",        color: "#2B7A9B", icon: "~" },
@@ -139,24 +140,29 @@ export default function HomeScreen() {
     resolu:   incidents.filter(i => i.status === 'resolu').length,
   };
 
+  const TopBar = (
+    <View style={styles.topBar}>
+      <View style={styles.logo}>
+        <Image source={require('../../assets/icon.png')} style={styles.logoIcon} resizeMode="contain" />
+        <View>
+          <Text style={styles.logoText}>Signal<Text style={{ color: COLORS.orange }}>Togo</Text></Text>
+          <Text style={styles.logoSub}>Plateforme citoyenne</Text>
+        </View>
+      </View>
+    </View>
+  );
+
   if (loading) return (
-    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.bg }}>
-      <ActivityIndicator size="large" color={COLORS.dark} />
+    <View style={styles.container}>
+      {TopBar}
+      <IncidentListSkeleton count={6} />
     </View>
   );
 
   return (
     <View style={styles.container}>
       {/* Top Bar */}
-      <View style={styles.topBar}>
-        <View style={styles.logo}>
-          <Image source={require('../../assets/icon.png')} style={styles.logoIcon} resizeMode="contain" />
-          <View>
-            <Text style={styles.logoText}>Signal<Text style={{ color: COLORS.orange }}>Togo</Text></Text>
-            <Text style={styles.logoSub}>Plateforme citoyenne</Text>
-          </View>
-        </View>
-      </View>
+      {TopBar}
 
       <ScrollView showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.dark} />}>
         {/* Hero */}
@@ -290,7 +296,7 @@ const styles = StyleSheet.create({
   logo:         { flexDirection: 'row', alignItems: 'center', gap: 10 },
   logoIcon:     { width: 34, height: 34, borderRadius: 10 },
   logoText:     { fontSize: 16, fontWeight: '800', color: '#1A1A1A' },
-  logoSub:      { fontSize: 10, color: '#B0ADA8', fontWeight: '500' },
+  logoSub:      { fontSize: 10, color: COLORS.textMuted, fontWeight: '500' },
 
   hero:         { backgroundColor: COLORS.dark, paddingHorizontal: 20, paddingTop: 24, paddingBottom: 20 },
   heroLabel:    { fontSize: 10, color: 'rgba(255,255,255,0.5)', letterSpacing: 1.5, fontWeight: '600' },
@@ -315,8 +321,8 @@ const styles = StyleSheet.create({
 
   errorText:    { color: '#C62828', textAlign: 'center', marginBottom: 12, fontSize: 13 },
   emptyState:   { alignItems: 'center', paddingTop: 60 },
-  emptyTitle:   { fontSize: 16, fontWeight: '700', color: '#999' },
-  emptySub:     { fontSize: 12, color: '#C8C5BF', marginTop: 4 },
+  emptyTitle:   { fontSize: 16, fontWeight: '700', color: COLORS.textSecondary },
+  emptySub:     { fontSize: 12, color: COLORS.textMuted, marginTop: 4 },
 
   card:         { backgroundColor: '#fff', borderRadius: 14, marginBottom: 10, overflow: 'hidden', borderWidth: 1, borderColor: '#EDECEA', elevation: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 3 },
   cardAccent:   { height: 3 },
@@ -330,13 +336,13 @@ const styles = StyleSheet.create({
   cardDesc:     { fontSize: 13, lineHeight: 19, color: '#333', marginBottom: 10 },
   cardFooter:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   cardMetaRow:  { flexDirection: 'row', alignItems: 'center', flex: 1 },
-  cardMeta:     { fontSize: 11, color: '#999', flex: 1 },
-  cardTime:     { fontSize: 10, color: '#C8C5BF', fontWeight: '500' },
+  cardMeta:     { fontSize: 11, color: COLORS.textSecondary, flex: 1 },
+  cardTime:     { fontSize: 10, color: COLORS.textMuted, fontWeight: '500' },
   cardActions:  { flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#F5F4F2' },
 
   upvoteBtn:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1.5, borderColor: COLORS.dark + '30', minWidth: 48, justifyContent: 'center' },
   upvoteBtnActive: { backgroundColor: COLORS.dark, borderColor: COLORS.dark },
   upvoteContent:   { flexDirection: 'row', alignItems: 'center', gap: 5 },
   upvoteText:      { fontSize: 12, fontWeight: '700', color: COLORS.dark },
-  soutienLabel:    { fontSize: 11, color: '#999', fontWeight: '500' },
+  soutienLabel:    { fontSize: 11, color: COLORS.textSecondary, fontWeight: '500' },
 });

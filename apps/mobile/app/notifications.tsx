@@ -3,6 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator
 import { router } from 'expo-router';
 import { apiClient, getToken } from '../lib/api';
 import { COLORS } from '../lib/theme';
+import { IncidentListSkeleton } from '../components/Skeleton';
 
 const NOTIF_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
   STATUS_UPDATE: { label: "Mise a jour",    color: "#2B7A9B", bg: "#E0F2F1" },
@@ -74,8 +75,17 @@ export default function NotificationsScreen() {
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
   if (loading) return (
-    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.bg }}>
-      <ActivityIndicator size="large" color={COLORS.dark} />
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} accessibilityRole="button" accessibilityLabel="Retour">
+          <View style={styles.backArrow} />
+        </TouchableOpacity>
+        <View style={styles.headerCenter}>
+          <Text style={styles.headerTitle}>Notifications</Text>
+        </View>
+        <View style={{ width: 60 }} />
+      </View>
+      <IncidentListSkeleton count={5} />
     </View>
   );
 

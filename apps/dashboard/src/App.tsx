@@ -28,6 +28,31 @@ function exportToCsv(filename: string, rows: Record<string, any>[]) {
   URL.revokeObjectURL(url);
 }
 
+// Bloc gris animé (placeholder de chargement). L'animation est définie dans index.css (@keyframes pulse).
+function Skeleton({ width = "100%", height = 14, radius = 6, style }: { width?: number | string; height?: number; radius?: number; style?: React.CSSProperties }) {
+  return (
+    <div
+      aria-hidden="true"
+      style={{ width, height, borderRadius: radius, background: "#ece9e4", animation: "pulse 1.4s ease-in-out infinite", ...style }}
+    />
+  );
+}
+
+// Lignes de tableau fantômes, reproduisant la grille des incidents pendant le chargement.
+function TableSkeleton({ rows = 8, cols = 7 }: { rows?: number; cols?: number }) {
+  return (
+    <div role="status" aria-label="Chargement des données">
+      {Array.from({ length: rows }).map((_, r) => (
+        <div key={r} style={{ display: "flex", gap: 12, padding: "16px 20px", borderBottom: "1px solid #faf8f5", alignItems: "center" }}>
+          {Array.from({ length: cols }).map((_, c) => (
+            <Skeleton key={c} width={c === 1 ? "30%" : `${Math.max(40, 90 - c * 8)}px`} height={12} />
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 
 const API_BASE = import.meta.env.VITE_API_URL || "/api/v1";
@@ -1358,7 +1383,9 @@ function EquipesView({ token, agents, reports, onOpenDetail, onRefresh, isAdmin,
           </div>
 
           {citizensLoading ? (
-            <div style={{ padding: 48, textAlign: "center", color: "#bbb", fontSize: 13 }}>Chargement…</div>
+            <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #ede9e3", overflow: "hidden" }}>
+              <TableSkeleton rows={6} cols={5} />
+            </div>
           ) : filteredCitizens.length === 0 ? (
             <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #ede9e3", padding: 48, textAlign: "center", color: "#bbb", fontSize: 13 }}>
               {search ? "Aucun citoyen ne correspond à la recherche." : isSuperAdmin ? "Aucun citoyen enregistré." : "Aucun citoyen enregistré dans cette commune."}
@@ -1433,7 +1460,18 @@ function EquipesView({ token, agents, reports, onOpenDetail, onRefresh, isAdmin,
       {/* ── Vue Demandes de changement de commune ───────────────────────── */}
       {tab === "demandes" && (
         requestsLoading ? (
-          <div style={{ padding: 48, textAlign: "center", color: "#bbb", fontSize: 13 }}>Chargement…</div>
+          <div style={{ display: "grid", gap: 12 }}>
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} style={{ background: "#fff", borderRadius: 16, border: "1px solid #ede9e3", padding: 20, display: "flex", alignItems: "center", gap: 16 }}>
+                <Skeleton width={44} height={44} radius={22} />
+                <div style={{ flex: 1 }}>
+                  <Skeleton width="40%" height={14} style={{ marginBottom: 8 }} />
+                  <Skeleton width="60%" height={12} />
+                </div>
+                <Skeleton width={90} height={32} radius={10} />
+              </div>
+            ))}
+          </div>
         ) : requests.length === 0 ? (
           <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #ede9e3", padding: 48, textAlign: "center", color: "#bbb", fontSize: 13 }}>
             Aucune demande de changement de commune en attente.
@@ -2067,7 +2105,17 @@ function CommunesAdminView({ token }: any) {
     }
   };
 
-  if (loading) return <div style={{ padding: 40, color: "#bbb" }}>Chargement...</div>;
+  if (loading) return (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 14 }}>
+      {Array.from({ length: 6 }).map((_, i) => (
+        <div key={i} style={{ background: "#fff", borderRadius: 16, border: "1px solid #ede9e3", padding: 20 }}>
+          <Skeleton width="55%" height={18} style={{ marginBottom: 10 }} />
+          <Skeleton width="35%" height={12} style={{ marginBottom: 16 }} />
+          <Skeleton width="100%" height={36} radius={10} />
+        </div>
+      ))}
+    </div>
+  );
 
   return (
     <div style={{ animation: "cardIn 0.4s ease both" }}>
@@ -2263,7 +2311,11 @@ function UsersAdminView({ token }: any) {
       </div>
 
       {err && <p style={{ color: "#C62828", fontSize: 12, marginBottom: 12 }}>{err}</p>}
-      {loading ? <div style={{ color: "#bbb", padding: 20 }}>Chargement...</div> : (
+      {loading ? (
+        <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #ede9e3", overflow: "hidden" }}>
+          <TableSkeleton rows={8} cols={4} />
+        </div>
+      ) : (
         <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #ede9e3", overflow: "hidden" }}>
           {users.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((u: any, i: number, arr: any[]) => {
             const rl = ROLE_LABELS[u.role] ?? ROLE_LABELS.CITIZEN;
@@ -2405,7 +2457,22 @@ export default function MairieDashboard() {
       <div style={{ flex: 1, padding: "28px 32px", overflowY: "auto", maxHeight: "100vh" }}>
         {token && <TopBar token={token} me={me} />}
         {loading ? (
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "60vh", fontSize: 13, color: "#bbb" }}>Chargement...</div>
+          <div style={{ animation: "fadeIn 0.3s ease" }}>
+            <Skeleton width={220} height={28} radius={8} style={{ marginBottom: 8 }} />
+            <Skeleton width={140} height={14} radius={6} style={{ marginBottom: 24 }} />
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14, marginBottom: 24 }}>
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} style={{ background: "#fff", borderRadius: 16, border: "1px solid #ede9e3", padding: 20 }}>
+                  <Skeleton width={40} height={40} radius={12} style={{ marginBottom: 14 }} />
+                  <Skeleton width="60%" height={22} style={{ marginBottom: 8 }} />
+                  <Skeleton width="40%" height={12} />
+                </div>
+              ))}
+            </div>
+            <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #ede9e3", overflow: "hidden" }}>
+              <TableSkeleton rows={8} />
+            </div>
+          </div>
         ) : (
           <>
             {page === "dashboard"  && <DashboardView reports={reports} onOpenDetail={setDetailReport} />}

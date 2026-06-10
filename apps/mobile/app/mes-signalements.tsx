@@ -3,6 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator
 import { router } from 'expo-router';
 import { apiClient, getToken, normalizeStatus } from '../lib/api';
 import { COLORS } from '../lib/theme';
+import { IncidentListSkeleton } from '../components/Skeleton';
 
 const CATEGORIES: Record<string, { label: string; color: string }> = {
   inondation: { label: "Inondation",        color: "#2B7A9B" },
@@ -73,22 +74,27 @@ export default function MesSignalementsScreen() {
 
   const filtered = filter === 'all' ? incidents : incidents.filter(i => i.status === filter);
 
+  const Header = (
+    <View style={styles.header}>
+      <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} accessibilityRole="button" accessibilityLabel="Retour">
+        <View style={styles.backArrow} />
+      </TouchableOpacity>
+      <Text style={styles.headerTitle}>Mes signalements</Text>
+      <View style={{ width: 36 }} />
+    </View>
+  );
+
   if (loading) return (
-    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.bg }}>
-      <ActivityIndicator size="large" color={COLORS.dark} />
+    <View style={styles.container}>
+      {Header}
+      <IncidentListSkeleton count={5} />
     </View>
   );
 
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <View style={styles.backArrow} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Mes signalements</Text>
-        <View style={{ width: 36 }} />
-      </View>
+      {Header}
 
       {/* Stats rapides */}
       <View style={styles.statsBar}>
