@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, Image } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, Image, ScrollView } from 'react-native';
 import { router } from 'expo-router';
 import { apiClient, saveToken, getToken, API_BASE } from '../lib/api';
 
@@ -62,7 +62,11 @@ export default function LoginScreen() {
 
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-      <View style={styles.inner}>
+      <ScrollView
+        contentContainerStyle={styles.inner}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
         {/* Logo */}
         <View style={styles.logoWrap}>
           <Image source={require('../assets/icon.png')} style={styles.logoImage} resizeMode="contain" />
@@ -131,14 +135,14 @@ export default function LoginScreen() {
             </>
           )}
         </View>
-      </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   container:  { flex: 1, backgroundColor: '#EDECEA' },
-  inner:      { flex: 1, justifyContent: 'center', padding: 24 },
+  inner:      { flexGrow: 1, justifyContent: 'center', padding: 24 },
   logoWrap:   { alignItems: 'center', marginBottom: 32 },
   logoImage:  { width: 160, height: 160 },
   card:       { backgroundColor: '#fff', borderRadius: 24, padding: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 16, elevation: 6 },
