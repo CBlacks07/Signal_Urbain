@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { IncidentCategory, Priority } from '@prisma/client';
-import { DEFAULT_SLA_RULES } from '@signal/types';
+import { DEFAULT_SLA_RULES } from '../common/sla.util';
 import { PrismaService } from '../common/prisma/prisma.service';
 
 function median(values: number[]): number {

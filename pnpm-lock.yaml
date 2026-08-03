@@ -76,9 +76,6 @@ importers:
       '@prisma/client':
         specifier: ^5.11.0
         version: 5.22.0(prisma@5.22.0)
-      '@signal/types':
-        specifier: workspace:*
-        version: link:../../packages/types
       bcryptjs:
         specifier: ^2.4.3
         version: 2.4.3

@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { IncidentCategory, IncidentStatus, NotificationType, Priority, Role } from '@prisma/client';
-import { computeDelayStatus, DEFAULT_SLA_RULES, DelayStatus } from '@signal/types';
+import { computeDelayStatus, DEFAULT_SLA_RULES, DelayStatus } from '../common/sla.util';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { paginate, buildPaginatedResponse } from '../common/dto/pagination.dto';
 import { NotificationsService } from '../notifications/notifications.service';

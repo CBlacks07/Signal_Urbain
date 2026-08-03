@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { Priority, Role } from '@prisma/client';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { AuditLogService } from '../common/audit/audit-log.service';
-import { DEFAULT_SLA_RULES } from '@signal/types';
+import { DEFAULT_SLA_RULES } from '../common/sla.util';
 
 @Injectable()
 export class AdminService {
