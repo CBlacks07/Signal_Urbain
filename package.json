@@ -36,5 +36,15 @@
     "prettier": "^3.2.5",
     "ts-jest": "^29.1.2",
     "typescript": "^5.4.2"
+  },
+  "pnpm": {
+    "packageExtensions": {
+      "lucide-react": {
+        "peerDependencies": { "@types/react": "^18.3.1" }
+      },
+      "react-leaflet": {
+        "peerDependencies": { "@types/react": "^18.3.1" }
+      }
+    }
   }
 }

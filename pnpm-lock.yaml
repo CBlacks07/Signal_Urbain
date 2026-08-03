@@ -4,6 +4,8 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+packageExtensionsChecksum: 7637afa4d0701879dd5feab4dd24c32e
+
 importers:
 
   .:
@@ -206,7 +208,7 @@ importers:
         version: 1.9.4
       lucide-react:
         specifier: ^0.359.0
-        version: 0.359.0(react@18.3.1)
+        version: 0.359.0(@types/react@18.3.28)(react@18.3.1)
       react:
         specifier: ^18.3.1
         version: 18.3.1
@@ -215,7 +217,7 @@ importers:
         version: 18.3.1(react@18.3.1)
       react-leaflet:
         specifier: ^4.2.1
-        version: 4.2.1(leaflet@1.9.4)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+        version: 4.2.1(@types/react@18.3.28)(leaflet@1.9.4)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       react-query:
         specifier: ^3.39.3
         version: 3.39.3(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -4601,6 +4603,7 @@ packages:
   lucide-react@0.359.0:
     resolution: {integrity: sha512-bxVL+rM/wacjpT0BKShA6r5IIKb6LCRg+ltFG9pnnIwaRX8kK3hq8v5JwMpT7RC6XeqB5cSaaV6GapPWWmtliw==}
     peerDependencies:
+      '@types/react': ^18.3.1
       react: ^16.5.1 || ^17.0.0 || ^18.0.0
 
   magic-string@0.30.8:
@@ -5240,6 +5243,7 @@ packages:
   react-leaflet@4.2.1:
     resolution: {integrity: sha512-p9chkvhcKrWn/H/1FFeVSqLdReGwn2qmiobOQGO3BifX+/vV/39qhY8dGqbdcPh1e6jxh/QHriLXr7a4eLFK4Q==}
     peerDependencies:
+      '@types/react': ^18.3.1
       leaflet: ^1.9.0
       react: ^18.0.0
       react-dom: ^18.0.0
@@ -11474,8 +11478,9 @@ snapshots:
       react-native: 0.83.2(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0)
       react-native-svg: 15.15.3(react-native@0.83.2(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0)
 
-  lucide-react@0.359.0(react@18.3.1):
+  lucide-react@0.359.0(@types/react@18.3.28)(react@18.3.1):
     dependencies:
+      '@types/react': 18.3.28
       react: 18.3.1
 
   magic-string@0.30.8:
@@ -12167,9 +12172,10 @@ snapshots:
 
   react-is@19.2.4: {}
 
-  react-leaflet@4.2.1(leaflet@1.9.4)(react-dom@18.3.1(react@18.3.1))(react@18.3.1):
+  react-leaflet@4.2.1(@types/react@18.3.28)(leaflet@1.9.4)(react-dom@18.3.1(react@18.3.1))(react@18.3.1):
     dependencies:
       '@react-leaflet/core': 2.1.0(leaflet@1.9.4)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      '@types/react': 18.3.28
       leaflet: 1.9.4
       react: 18.3.1
       react-dom: 18.3.1(react@18.3.1)
