@@ -1,8 +1,10 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { IncidentCategory, IncidentStatus, NotificationType, Priority, Role } from '@prisma/client';
+import { computeDelayStatus, DEFAULT_SLA_RULES, DelayStatus } from '@signal/types';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { paginate, buildPaginatedResponse } from '../common/dto/pagination.dto';
 import { NotificationsService } from '../notifications/notifications.service';
+import { AuditLogService } from '../common/audit/audit-log.service';
 
 export interface CreateIncidentDto {
   category: IncidentCategory;
@@ -22,6 +24,7 @@ export interface ListIncidentsDto {
   category?: string;
   communeId?: string;
   reporterId?: string;
+  assignedTo?: string;
   search?: string;
   sort?: string;
   near?: string;
@@ -34,6 +37,8 @@ export interface UpdateIncidentDto {
   assignedTo?: string;
   service?: string;
   note?: string;
+  /** Bloque l'incident en attente d'un tiers (ex. "Attente CEET") ; passer null pour débloquer. */
+  blockedReason?: string | null;
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -49,7 +54,20 @@ export class IncidentsService {
   constructor(
     private prisma: PrismaService,
     private notifications: NotificationsService,
+    private auditLog: AuditLogService,
   ) {}
+
+  private async getSlaRules() {
+    const rules = await this.prisma.slaRule.findMany();
+    return rules.length > 0 ? rules : DEFAULT_SLA_RULES;
+  }
+
+  private withDelay<T extends { createdAt: Date; priority: Priority; blockedSince: Date | null }>(
+    incident: T,
+    rules: { priority: Priority; targetHours: number }[],
+  ): T & { delay: DelayStatus } {
+    return { ...incident, delay: computeDelayStatus(incident.createdAt, incident.priority, rules, incident.blockedSince) };
+  }
 
   async create(reporterId: string, dto: CreateIncidentDto) {
     // Génère un code de référence unique
@@ -85,13 +103,16 @@ export class IncidentsService {
     const { page = 1, limit = 20 } = dto;
     const pageInt = Number(page);
     const limitInt = Number(limit);
-    const where: any = {};
+    // Un incident fusionné dans un autre disparaît des listes par défaut : il reste consultable
+    // via l'incident primaire (champ `duplicates`), mais ne doit pas polluer la file de travail.
+    const where: any = { mergedIntoId: null };
 
     if (dto.status) where.status = { in: dto.status.split(',') as IncidentStatus[] };
     if (dto.priority) where.priority = { in: dto.priority.split(',') as Priority[] };
     if (dto.category) where.category = { in: dto.category.split(',') as IncidentCategory[] };
     if (dto.communeId) where.communeId = dto.communeId;
     if (dto.reporterId) where.reporterId = dto.reporterId;
+    if (dto.assignedTo) where.assignedTo = dto.assignedTo;
     if (dto.search) {
       where.OR = [
         { description: { contains: dto.search, mode: 'insensitive' } },
@@ -103,7 +124,7 @@ export class IncidentsService {
     const [sort, order] = (dto.sort || 'created_at:desc').split(':');
     const orderBy: any = { [sort === 'created_at' ? 'createdAt' : sort]: order || 'desc' };
 
-    const [data, total] = await Promise.all([
+    const [data, total, rules] = await Promise.all([
       this.prisma.incident.findMany({
         where,
         orderBy,
@@ -116,33 +137,82 @@ export class IncidentsService {
         },
       }),
       this.prisma.incident.count({ where }),
+      this.getSlaRules(),
     ]);
 
-    return buildPaginatedResponse(data, total, page, limit);
+    return buildPaginatedResponse(data.map((i) => this.withDelay(i, rules)), total, page, limit);
   }
 
   async findOne(id: string) {
-    const incident = await this.prisma.incident.findUnique({
-      where: { id },
-      include: {
-        reporter: { select: { id: true, name: true, avatarUrl: true } },
-        assignedAgent: { select: { id: true, name: true } },
-        commune: true,
-        photos: { orderBy: { order: 'asc' } },
-        comments: {
-          where: { isInternal: false },
-          include: { user: { select: { id: true, name: true, avatarUrl: true } } },
-          orderBy: { createdAt: 'desc' },
-          take: 20,
+    const [incident, rules] = await Promise.all([
+      this.prisma.incident.findUnique({
+        where: { id },
+        include: {
+          reporter: { select: { id: true, name: true, avatarUrl: true } },
+          assignedAgent: { select: { id: true, name: true } },
+          commune: true,
+          photos: { orderBy: { order: 'asc' } },
+          comments: {
+            where: { isInternal: false },
+            include: { user: { select: { id: true, name: true, avatarUrl: true } } },
+            orderBy: { createdAt: 'desc' },
+            take: 20,
+          },
+          statusHistory: {
+            include: { agent: { select: { id: true, name: true } } },
+            orderBy: { createdAt: 'desc' },
+          },
+          duplicates: {
+            select: { id: true, refCode: true, description: true, reporter: { select: { name: true } }, createdAt: true },
+          },
         },
-        statusHistory: {
-          include: { agent: { select: { id: true, name: true } } },
-          orderBy: { createdAt: 'desc' },
-        },
-      },
-    });
+      }),
+      this.getSlaRules(),
+    ]);
     if (!incident) throw new NotFoundException('Incident introuvable');
-    return incident;
+    return this.withDelay(incident, rules);
+  }
+
+  /** Fusionne des signalements doublons dans un incident primaire : ils disparaissent des listes et de leurs compteurs s'additionnent. */
+  async merge(primaryId: string, duplicateIds: string[], actorId: string) {
+    const ids = duplicateIds.filter((id) => id !== primaryId);
+    if (ids.length === 0) throw new BadRequestException('Aucun doublon à fusionner');
+
+    const [primary, duplicates] = await Promise.all([
+      this.prisma.incident.findUnique({ where: { id: primaryId } }),
+      this.prisma.incident.findMany({ where: { id: { in: ids } } }),
+    ]);
+    if (!primary) throw new NotFoundException('Incident primaire introuvable');
+    if (duplicates.some((d) => d.communeId !== primary.communeId)) {
+      throw new BadRequestException('Les signalements à fusionner doivent être dans la même commune');
+    }
+
+    const extraUpvotes = duplicates.reduce((sum, d) => sum + d.upvotesCount, 0);
+    await this.prisma.$transaction([
+      this.prisma.incident.updateMany({ where: { id: { in: ids } }, data: { mergedIntoId: primaryId } }),
+      this.prisma.incident.update({ where: { id: primaryId }, data: { upvotesCount: { increment: extraUpvotes } } }),
+    ]);
+
+    this.auditLog.log(actorId, 'MERGE_INCIDENTS', 'Incident', primaryId, { duplicateIds: ids });
+    return this.findOne(primaryId);
+  }
+
+  /** Défusionne : les doublons redeviennent des incidents autonomes et réapparaissent dans les listes. */
+  async unmerge(primaryId: string, actorId: string) {
+    const [duplicates, primary] = await Promise.all([
+      this.prisma.incident.findMany({ where: { mergedIntoId: primaryId } }),
+      this.prisma.incident.findUnique({ where: { id: primaryId } }),
+    ]);
+    if (duplicates.length === 0 || !primary) return this.findOne(primaryId);
+
+    const extraUpvotes = Math.min(duplicates.reduce((sum, d) => sum + d.upvotesCount, 0), primary.upvotesCount);
+    await this.prisma.$transaction([
+      this.prisma.incident.updateMany({ where: { mergedIntoId: primaryId }, data: { mergedIntoId: null } }),
+      this.prisma.incident.update({ where: { id: primaryId }, data: { upvotesCount: { decrement: extraUpvotes } } }),
+    ]);
+
+    this.auditLog.log(actorId, 'UNMERGE_INCIDENTS', 'Incident', primaryId, { duplicateIds: duplicates.map((d) => d.id) });
+    return this.findOne(primaryId);
   }
 
   async update(id: string, agentId: string, agentRole: Role, agentCommuneId: string | null, dto: UpdateIncidentDto) {
@@ -154,6 +224,16 @@ export class IncidentsService {
       throw new ForbiddenException('Vous ne pouvez modifier que les incidents de votre commune');
     }
 
+    if (dto.status === 'RESOLU') {
+      const settings = await this.prisma.slaSettings.findUnique({ where: { id: 'default' } });
+      if (settings?.requireAfterPhoto) {
+        const afterPhoto = await this.prisma.incidentPhoto.count({ where: { incidentId: id, kind: 'APRES' } });
+        if (afterPhoto === 0) {
+          throw new BadRequestException('Une photo « après » est obligatoire pour clore ce dossier');
+        }
+      }
+    }
+
     const updates: any = {};
     if (dto.status) {
       updates.status = dto.status;
@@ -162,6 +242,10 @@ export class IncidentsService {
     if (dto.priority) updates.priority = dto.priority;
     if (dto.assignedTo !== undefined) updates.assignedTo = dto.assignedTo;
     if (dto.service !== undefined) updates.service = dto.service;
+    if (dto.blockedReason !== undefined) {
+      updates.blockedReason = dto.blockedReason;
+      updates.blockedSince = dto.blockedReason ? new Date() : null;
+    }
 
     const [updated] = await this.prisma.$transaction([
       this.prisma.incident.update({ where: { id }, data: updates }),
@@ -187,6 +271,12 @@ export class IncidentsService {
         `${incident.refCode} — ${label}`,
         { type: NotificationType.STATUS_UPDATE, incidentId: id, data: { incidentId: id } },
       ).catch(() => {}); // silencieux en cas d'erreur push
+
+      this.auditLog.log(agentId, 'UPDATE_INCIDENT_STATUS', 'Incident', id, {
+        refCode: incident.refCode,
+        from: incident.status,
+        to: dto.status,
+      });
     }
 
     return updated;

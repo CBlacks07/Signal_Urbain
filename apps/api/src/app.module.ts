@@ -3,6 +3,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { PrismaModule } from './common/prisma/prisma.module';
+import { AuditLogModule } from './common/audit/audit-log.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { IncidentsModule } from './incidents/incidents.module';
@@ -35,6 +36,7 @@ import { AdminModule } from './admin/admin.module';
 
     // ─── Database (Prisma) ──────────────────────────────
     PrismaModule,
+    AuditLogModule,
 
     // ─── Modules métier ─────────────────────────────────
     AuthModule,

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native';
 import { router } from 'expo-router';
 import { apiClient, getToken, normalizeStatus } from '../lib/api';
 import { COLORS } from '../lib/theme';
@@ -15,12 +15,12 @@ const CATEGORIES: Record<string, { label: string; color: string }> = {
   autre:      { label: "Autre",             color: "#6B6B6B" },
 };
 
-const STATUS_MAP: Record<string, { label: string; color: string; bg: string }> = {
-  signale:  { label: "Signale",  color: "#D4760A", bg: "#FFF3E0" },
-  assigne:  { label: "Assigne",  color: "#1565C0", bg: "#E3F2FD" },
-  en_cours: { label: "En cours", color: "#2B7A9B", bg: "#E0F2F1" },
-  resolu:   { label: "Resolu",   color: "#2E7D32", bg: "#E8F5E9" },
-  rejete:   { label: "Rejete",   color: "#C62828", bg: "#FFEBEE" },
+const STATUS_MAP: Record<string, { label: string; color: string; bg: string; step: number }> = {
+  signale:  { label: "Signale",  color: "#D4760A", bg: "#FFF3E0", step: 1 },
+  assigne:  { label: "Assigne",  color: "#1565C0", bg: "#E3F2FD", step: 2 },
+  en_cours: { label: "En cours", color: "#2B7A9B", bg: "#E0F2F1", step: 3 },
+  resolu:   { label: "Resolu",   color: "#2E7D32", bg: "#E8F5E9", step: 4 },
+  rejete:   { label: "Rejete",   color: "#C62828", bg: "#FFEBEE", step: 0 },
 };
 
 function getTimeAgo(dateStr: string): string {
@@ -176,6 +176,21 @@ export default function MesSignalementsScreen() {
                   <Text style={[styles.catLabel, { color: cat.color }]}>{cat.label}</Text>
                 </View>
                 <Text style={styles.cardDesc} numberOfLines={2}>{incident.description}</Text>
+                <View style={styles.progressRow}>
+                  {[1, 2, 3, 4].map((step) => (
+                    <View key={step} style={[styles.progressSeg, { backgroundColor: step <= st.step ? (step === st.step ? '#D4760A' : COLORS.dark) : '#EDECEA' }]} />
+                  ))}
+                </View>
+                {incident.status === 'resolu' && (incident.photos ?? []).some((p: any) => p.kind === 'APRES') && (
+                  <View style={styles.beforeAfterRow}>
+                    {(incident.photos ?? []).filter((p: any) => p.kind !== 'APRES').slice(0, 1).map((p: any) => (
+                      <Image key={p.id} source={{ uri: p.thumbnailUrl }} style={styles.beforeAfterImg} />
+                    ))}
+                    {(incident.photos ?? []).filter((p: any) => p.kind === 'APRES').slice(0, 1).map((p: any) => (
+                      <Image key={p.id} source={{ uri: p.thumbnailUrl }} style={styles.beforeAfterImg} />
+                    ))}
+                  </View>
+                )}
                 <View style={styles.cardFooter}>
                   <Text style={styles.cardAddr} numberOfLines={1}>{incident.address}</Text>
                   <View style={styles.cardMeta}>
@@ -234,6 +249,10 @@ const styles = StyleSheet.create({
   catDot:        { width: 7, height: 7, borderRadius: 3.5 },
   catLabel:      { fontSize: 11, fontWeight: '600' },
   cardDesc:      { fontSize: 13, color: '#333', lineHeight: 19, marginBottom: 10 },
+  progressRow:   { flexDirection: 'row', gap: 5, marginBottom: 10 },
+  progressSeg:   { flex: 1, height: 5, borderRadius: 3 },
+  beforeAfterRow:{ flexDirection: 'row', gap: 6, marginBottom: 10 },
+  beforeAfterImg:{ flex: 1, height: 58, borderRadius: 8, backgroundColor: '#EDECEA' },
   cardFooter:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 10, borderTopWidth: 1, borderTopColor: '#F5F4F2' },
   cardAddr:      { fontSize: 11, color: '#999', flex: 1 },
   cardMeta:      { flexDirection: 'row', alignItems: 'center', gap: 10 },

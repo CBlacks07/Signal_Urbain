@@ -1,10 +1,15 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { Role } from '@prisma/client';
+import { Priority, Role } from '@prisma/client';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { AuditLogService } from '../common/audit/audit-log.service';
+import { DEFAULT_SLA_RULES } from '@signal/types';
 
 @Injectable()
 export class AdminService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private auditLog: AuditLogService,
+  ) {}
 
   // ─── Stats globales ───────────────────────────────────────────────────────
 
@@ -54,16 +59,22 @@ export class AdminService {
     return communes;
   }
 
-  async createCommune(data: { name: string; prefecture: string; contactEmail?: string; contactPhone?: string }) {
-    return this.prisma.commune.create({ data });
+  async createCommune(actorId: string, data: { name: string; prefecture: string; contactEmail?: string; contactPhone?: string }) {
+    const commune = await this.prisma.commune.create({ data });
+    this.auditLog.log(actorId, 'CREATE_COMMUNE', 'Commune', commune.id, { name: commune.name });
+    return commune;
   }
 
-  async updateCommune(id: string, data: { name?: string; prefecture?: string; contactEmail?: string; contactPhone?: string }) {
-    return this.prisma.commune.update({ where: { id }, data });
+  async updateCommune(actorId: string, id: string, data: { name?: string; prefecture?: string; contactEmail?: string; contactPhone?: string }) {
+    const commune = await this.prisma.commune.update({ where: { id }, data });
+    this.auditLog.log(actorId, 'UPDATE_COMMUNE', 'Commune', commune.id, data);
+    return commune;
   }
 
-  async deleteCommune(id: string) {
-    return this.prisma.commune.delete({ where: { id } });
+  async deleteCommune(actorId: string, id: string) {
+    const commune = await this.prisma.commune.delete({ where: { id } });
+    this.auditLog.log(actorId, 'DELETE_COMMUNE', 'Commune', id, { name: commune.name });
+    return commune;
   }
 
   // ─── Utilisateurs ─────────────────────────────────────────────────────────
@@ -80,19 +91,65 @@ export class AdminService {
     });
   }
 
-  async updateUserRole(id: string, role: Role) {
+  async updateUserRole(actorId: string, id: string, role: Role) {
     const user = await this.prisma.user.findUnique({ where: { id } });
     if (!user) throw new NotFoundException('Utilisateur introuvable');
-    return this.prisma.user.update({ where: { id }, data: { role } });
+    const updated = await this.prisma.user.update({ where: { id }, data: { role } });
+    this.auditLog.log(actorId, 'UPDATE_USER_ROLE', 'User', id, { from: user.role, to: role });
+    return updated;
   }
 
-  async updateUserCommune(id: string, communeId: string | null) {
+  async updateUserCommune(actorId: string, id: string, communeId: string | null) {
     const user = await this.prisma.user.findUnique({ where: { id } });
     if (!user) throw new NotFoundException('Utilisateur introuvable');
-    return this.prisma.user.update({ where: { id }, data: { communeId } });
+    const updated = await this.prisma.user.update({ where: { id }, data: { communeId } });
+    this.auditLog.log(actorId, 'UPDATE_USER_COMMUNE', 'User', id, { from: user.communeId, to: communeId });
+    return updated;
   }
 
-  async deleteUser(id: string) {
-    return this.prisma.user.delete({ where: { id } });
+  async deleteUser(actorId: string, id: string) {
+    const user = await this.prisma.user.delete({ where: { id } });
+    this.auditLog.log(actorId, 'DELETE_USER', 'User', id, { name: user.name });
+    return user;
+  }
+
+  // ─── Règles de délai (SLA) ────────────────────────────────────────────────
+
+  async getSlaRules() {
+    const rules = await this.prisma.slaRule.findMany({ orderBy: { targetHours: 'asc' } });
+    if (rules.length > 0) return rules;
+    // Filet de sécurité si le seed n'a pas encore tourné : renvoie les valeurs par défaut sans les persister.
+    return DEFAULT_SLA_RULES.map((r) => ({ id: r.priority, ...r, updatedAt: new Date().toISOString() }));
+  }
+
+  async updateSlaRule(actorId: string, priority: Priority, targetHours: number) {
+    const rule = await this.prisma.slaRule.upsert({
+      where: { priority },
+      update: { targetHours },
+      create: { priority, targetHours },
+    });
+    this.auditLog.log(actorId, 'UPDATE_SLA_RULE', 'SlaRule', rule.id, { priority, targetHours });
+    return rule;
+  }
+
+  async getSlaSettings() {
+    const settings = await this.prisma.slaSettings.findUnique({ where: { id: 'default' } });
+    return settings ?? (await this.prisma.slaSettings.create({ data: { id: 'default' } }));
+  }
+
+  async updateSlaSettings(actorId: string, data: { suspendOnThirdParty?: boolean; requireAfterPhoto?: boolean }) {
+    const settings = await this.prisma.slaSettings.upsert({
+      where: { id: 'default' },
+      update: data,
+      create: { id: 'default', ...data },
+    });
+    this.auditLog.log(actorId, 'UPDATE_SLA_SETTINGS', 'SlaSettings', settings.id, data);
+    return settings;
+  }
+
+  // ─── Journal d'audit ──────────────────────────────────────────────────────
+
+  async getAuditLog(page = 1, limit = 30) {
+    return this.auditLog.findAll(page, limit);
   }
 }

@@ -6,10 +6,12 @@ export const COLORS = {
   // Marque
   dark: '#1A472A',
   darkSoft: '#1A472A20',
+  railDark: '#12301E',
   orange: '#D4760A',
+  orangeLight: '#E8950F',
 
   // Fonds
-  bg: '#F5F4F2',
+  bg: '#F5F3EF',
   bgLight: '#FDFCFA',
   surface: '#FFFFFF',
   border: '#EDECEA',
@@ -56,6 +58,18 @@ export const FONT = {
   semibold: '600' as const,
   bold: '700' as const,
   black: '800' as const,
+};
+
+// Familles de police chargées via useFonts() dans app/_layout.tsx (expo-font + @expo-google-fonts).
+// Tant que les polices ne sont pas prêtes, ces clés retombent sur la police système par défaut.
+export const FONT_FAMILY = {
+  body: 'DMSans_400Regular',
+  bodyMedium: 'DMSans_500Medium',
+  bodySemibold: 'DMSans_600SemiBold',
+  bodyBold: 'DMSans_700Bold',
+  display: 'Outfit_600SemiBold',
+  displayBold: 'Outfit_700Bold',
+  displayBlack: 'Outfit_800ExtraBold',
 };
 
 export const SHADOW = {

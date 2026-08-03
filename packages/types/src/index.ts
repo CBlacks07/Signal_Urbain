@@ -48,66 +48,6 @@ export interface Commune {
   contactPhone?: string;
 }
 
-export interface Incident {
-  id: string;
-  refCode: string;
-  category: IncidentCategory;
-  status: IncidentStatus;
-  priority: Priority;
-  title: string;
-  description: string;
-  latitude: number;
-  longitude: number;
-  photoUrls?: string[];
-  citizenId: string;
-  communeId: string;
-  agentId?: string;
-  upvotes: number;
-  commentCount: number;
-  createdAt: string;
-  updatedAt: string;
-  resolvedAt?: string;
-}
-
-export interface Comment {
-  id: string;
-  content: string;
-  userId: string;
-  user?: User;
-  incidentId: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface Notification {
-  id: string;
-  type: NotificationType;
-  title: string;
-  message: string;
-  userId: string;
-  incidentId?: string;
-  isRead: boolean;
-  createdAt: string;
-}
-
-export interface ApiResponse<T = any> {
-  statusCode: number;
-  message: string;
-  data?: T;
-  timestamp: string;
-}
-
-export interface PaginationMeta {
-  page: number;
-  limit: number;
-  total: number;
-  totalPages: number;
-}
-
-export interface PaginatedResponse<T> extends ApiResponse<T[]> {
-  meta: PaginationMeta;
-}
-
 // ─── DTOs (Data Transfer Objects) ──────────────────────────────────────────
 
 export interface RequestOtpDto {
@@ -125,16 +65,20 @@ export interface RefreshTokenDto {
 
 export interface CreateIncidentDto {
   category: IncidentCategory;
-  title: string;
   description: string;
+  address: string;
+  communeId: string;
   latitude: number;
   longitude: number;
-  photoUrls?: string[];
+  photoIds?: string[];
 }
 
-export interface UpdateIncidentStatusDto {
-  status: IncidentStatus;
-  comment?: string;
+export interface UpdateIncidentDto {
+  status?: IncidentStatus;
+  priority?: Priority;
+  assignedTo?: string;
+  service?: string;
+  note?: string;
 }
 
 export interface CreateCommentDto {
@@ -145,21 +89,6 @@ export interface CreateCommentDto {
 export interface PaginationDto {
   page?: number;
   limit?: number;
-}
-
-// ─── Auth Response ────────────────────────────────────────────────────────────
-
-export interface AuthTokens {
-  accessToken: string;
-  refreshToken: string;
-  expiresIn: number;
-}
-
-export interface AuthResponse extends ApiResponse {
-  data: {
-    user: User;
-    tokens: AuthTokens;
-  };
 }
 
 export interface Incident {
@@ -243,3 +172,103 @@ export interface DashboardStats {
   recentIncidents: Partial<Incident>[];
   topUpvoted: Partial<Incident>[];
 }
+
+// ─── SLA / Administration ──────────────────────────────────────────────────────
+
+export type PhotoKind = 'AVANT' | 'APRES';
+
+export interface SlaRule {
+  id: string;
+  priority: Priority;
+  targetHours: number;
+  updatedAt: string;
+}
+
+export interface SlaSettings {
+  id: string;
+  suspendOnThirdParty: boolean;
+  requireAfterPhoto: boolean;
+  updatedAt: string;
+}
+
+export interface AuditLogEntry {
+  id: string;
+  userId?: string;
+  user?: Pick<User, 'id' | 'name'>;
+  action: string;
+  entity: string;
+  entityId: string;
+  details?: Record<string, unknown>;
+  createdAt: string;
+}
+
+// ─── Calcul du délai d'intervention (SLA) ──────────────────────────────────────
+// Logique unique partagée par l'API, le dashboard et le mobile pour que les
+// badges "hors délai" / "reste X h" affichent toujours le même chiffre partout.
+// (Regroupée ici, plutôt que dans un fichier séparé, pour éviter les soucis de
+// résolution des imports relatifs sans extension avec le TypeScript natif de Node.)
+
+export interface SlaRuleLike {
+  priority: Priority;
+  targetHours: number;
+}
+
+export interface DelayStatus {
+  /** Échéance calculée, ISO 8601. */
+  dueAt: string;
+  /** Heures restantes avant l'échéance (négatif si dépassée). */
+  hoursRemaining: number;
+  isOverdue: boolean;
+  /** Vrai si l'incident est actuellement bloqué en attente d'un tiers (décompte suspendu). */
+  isBlocked: boolean;
+}
+
+const FALLBACK_TARGET_HOURS = 72;
+const HOUR_MS = 60 * 60 * 1000;
+
+export function computeDelayStatus(
+  createdAt: string | Date,
+  priority: Priority,
+  rules: SlaRuleLike[],
+  blockedSince?: string | Date | null,
+  now: Date = new Date(),
+): DelayStatus {
+  const targetHours = rules.find((r) => r.priority === priority)?.targetHours ?? FALLBACK_TARGET_HOURS;
+  const dueAt = new Date(new Date(createdAt).getTime() + targetHours * HOUR_MS);
+
+  // Le décompte est suspendu tant que l'incident est bloqué en attente d'un tiers :
+  // le temps déjà écoulé pendant le blocage est neutralisé en repoussant l'échéance d'autant.
+  const isBlocked = !!blockedSince;
+  let effectiveDueAt = dueAt;
+  if (isBlocked) {
+    const blockedMs = Math.max(0, now.getTime() - new Date(blockedSince as string | Date).getTime());
+    effectiveDueAt = new Date(dueAt.getTime() + blockedMs);
+  }
+
+  const hoursRemaining = Math.round(((effectiveDueAt.getTime() - now.getTime()) / HOUR_MS) * 10) / 10;
+
+  return {
+    dueAt: effectiveDueAt.toISOString(),
+    hoursRemaining,
+    isOverdue: hoursRemaining < 0,
+    isBlocked,
+  };
+}
+
+/** Formate des heures en "−1 j 6 h" / "5 h" / "1 j", comme dans le design. */
+export function formatDelay(hours: number): string {
+  const sign = hours < 0 ? '−' : '';
+  const abs = Math.abs(hours);
+  const days = Math.floor(abs / 24);
+  const remHours = Math.round(abs - days * 24);
+  if (days > 0 && remHours > 0) return `${sign}${days} j ${remHours} h`;
+  if (days > 0) return `${sign}${days} j`;
+  return `${sign}${remHours} h`;
+}
+
+export const DEFAULT_SLA_RULES: SlaRuleLike[] = [
+  { priority: 'CRITIQUE', targetHours: 12 },
+  { priority: 'HAUTE', targetHours: 48 },
+  { priority: 'MOYENNE', targetHours: 120 },
+  { priority: 'BASSE', targetHours: 360 },
+];

@@ -63,6 +63,20 @@ export class IncidentsController {
     return this.incidents.update(id, userId, role, communeId, dto);
   }
 
+  @Post(':id/merge')
+  @Roles(Role.AGENT)
+  @ApiOperation({ summary: 'Fusionne des signalements doublons dans cet incident (AGENT+)' })
+  merge(@Param('id') id: string, @CurrentUser('id') userId: string, @Body('duplicateIds') duplicateIds: string[]) {
+    return this.incidents.merge(id, duplicateIds ?? [], userId);
+  }
+
+  @Delete(':id/merge')
+  @Roles(Role.AGENT)
+  @ApiOperation({ summary: 'Défusionne tous les doublons de cet incident (AGENT+)' })
+  unmerge(@Param('id') id: string, @CurrentUser('id') userId: string) {
+    return this.incidents.unmerge(id, userId);
+  }
+
   @Post(':id/upvote')
   @Roles(Role.CITIZEN)
   upvote(@Param('id') id: string, @CurrentUser('id') userId: string) {

@@ -1,9 +1,10 @@
 import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
-import { Role } from '@prisma/client';
+import { Priority, Role } from '@prisma/client';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { AdminService } from './admin.service';
 
 @ApiTags('Admin')
@@ -29,22 +30,26 @@ export class AdminController {
   }
 
   @Post('communes')
-  createCommune(@Body() body: { name: string; prefecture: string; contactEmail?: string; contactPhone?: string }) {
-    return this.admin.createCommune(body);
+  createCommune(
+    @CurrentUser('id') actorId: string,
+    @Body() body: { name: string; prefecture: string; contactEmail?: string; contactPhone?: string },
+  ) {
+    return this.admin.createCommune(actorId, body);
   }
 
   @Patch('communes/:id')
   updateCommune(
+    @CurrentUser('id') actorId: string,
     @Param('id') id: string,
     @Body() body: { name?: string; prefecture?: string; contactEmail?: string; contactPhone?: string },
   ) {
-    return this.admin.updateCommune(id, body);
+    return this.admin.updateCommune(actorId, id, body);
   }
 
   @Delete('communes/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  deleteCommune(@Param('id') id: string) {
-    return this.admin.deleteCommune(id);
+  deleteCommune(@CurrentUser('id') actorId: string, @Param('id') id: string) {
+    return this.admin.deleteCommune(actorId, id);
   }
 
   // ─── Utilisateurs ─────────────────────────────────────────────────────────
@@ -55,18 +60,58 @@ export class AdminController {
   }
 
   @Patch('users/:id/role')
-  updateRole(@Param('id') id: string, @Body() body: { role: Role }) {
-    return this.admin.updateUserRole(id, body.role);
+  updateRole(@CurrentUser('id') actorId: string, @Param('id') id: string, @Body() body: { role: Role }) {
+    return this.admin.updateUserRole(actorId, id, body.role);
   }
 
   @Patch('users/:id/commune')
-  updateCommuneOfUser(@Param('id') id: string, @Body() body: { communeId: string | null }) {
-    return this.admin.updateUserCommune(id, body.communeId);
+  updateCommuneOfUser(
+    @CurrentUser('id') actorId: string,
+    @Param('id') id: string,
+    @Body() body: { communeId: string | null },
+  ) {
+    return this.admin.updateUserCommune(actorId, id, body.communeId);
   }
 
   @Delete('users/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  deleteUser(@Param('id') id: string) {
-    return this.admin.deleteUser(id);
+  deleteUser(@CurrentUser('id') actorId: string, @Param('id') id: string) {
+    return this.admin.deleteUser(actorId, id);
+  }
+
+  // ─── Règles de délai (SLA) ────────────────────────────────────────────────
+
+  @Get('sla-rules')
+  getSlaRules() {
+    return this.admin.getSlaRules();
+  }
+
+  @Patch('sla-rules/:priority')
+  updateSlaRule(
+    @CurrentUser('id') actorId: string,
+    @Param('priority') priority: Priority,
+    @Body() body: { targetHours: number },
+  ) {
+    return this.admin.updateSlaRule(actorId, priority, body.targetHours);
+  }
+
+  @Get('sla-settings')
+  getSlaSettings() {
+    return this.admin.getSlaSettings();
+  }
+
+  @Patch('sla-settings')
+  updateSlaSettings(
+    @CurrentUser('id') actorId: string,
+    @Body() body: { suspendOnThirdParty?: boolean; requireAfterPhoto?: boolean },
+  ) {
+    return this.admin.updateSlaSettings(actorId, body);
+  }
+
+  // ─── Journal d'audit ──────────────────────────────────────────────────────
+
+  @Get('audit-log')
+  getAuditLog(@Query('page') page?: string, @Query('limit') limit?: string) {
+    return this.admin.getAuditLog(page ? Number(page) : undefined, limit ? Number(limit) : undefined);
   }
 }

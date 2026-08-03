@@ -19,3 +19,12 @@ export const apiClient = (token?: string | null) =>
 
 // Normalise le statut API (SIGNALE → signale)
 export const normalizeStatus = (s: string) => s?.toLowerCase() ?? 'signale';
+
+export const decodeJwt = (token: string): { sub: string; role: string } | null => {
+  try {
+    const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(atob(base64));
+  } catch {
+    return null;
+  }
+};

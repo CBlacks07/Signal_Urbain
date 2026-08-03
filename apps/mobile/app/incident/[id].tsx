@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, TextInput } from 'react-native';
+import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, TextInput } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { apiClient, getToken } from '../../lib/api';
 import { COLORS } from '../../lib/theme';
@@ -149,6 +149,28 @@ export default function IncidentDetailScreen() {
             {incident.commune?.name && <Text style={styles.metaLine}>{incident.commune.name}</Text>}
           </View>
 
+          {/* Photos avant / après */}
+          {(incident.photos ?? []).length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Constat avant</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: (incident.photos ?? []).some((p: any) => p.kind === 'APRES') ? 16 : 0 }}>
+                {(incident.photos ?? []).filter((p: any) => p.kind !== 'APRES').map((p: any) => (
+                  <Image key={p.id} source={{ uri: p.thumbnailUrl || p.url }} style={styles.photoThumb} />
+                ))}
+              </ScrollView>
+              {(incident.photos ?? []).some((p: any) => p.kind === 'APRES') && (
+                <>
+                  <Text style={styles.sectionTitle}>Preuve après intervention</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                    {(incident.photos ?? []).filter((p: any) => p.kind === 'APRES').map((p: any) => (
+                      <Image key={p.id} source={{ uri: p.thumbnailUrl || p.url }} style={styles.photoThumb} />
+                    ))}
+                  </ScrollView>
+                </>
+              )}
+            </View>
+          )}
+
           {/* Signalé par */}
           {incident.reporter && (
             <View style={styles.section}>
@@ -218,6 +240,7 @@ const styles = StyleSheet.create({
   sectionTitle:    { fontSize: 12, fontWeight: '700', color: '#888', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 },
   description:     { fontSize: 14, lineHeight: 22, color: '#2c2c2c' },
   metaLine:        { fontSize: 13, color: '#555', marginBottom: 4 },
+  photoThumb:      { width: 96, height: 96, borderRadius: 10, marginRight: 8, backgroundColor: '#EDECEA' },
   upvoteBtn:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 14, borderRadius: 14, borderWidth: 2, borderColor: COLORS.dark, marginBottom: 20 },
   upvoteBtnActive: { backgroundColor: COLORS.dark, borderColor: COLORS.dark },
   upvoteIcon:      { fontSize: 16, color: COLORS.dark },

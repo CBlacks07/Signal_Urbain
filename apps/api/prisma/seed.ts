@@ -204,6 +204,28 @@ async function main() {
   }
 
   console.log(`${created} incidents créés`);
+
+  // ─── Règles de délai (SLA) ─────────────────────────
+  const slaRules: Array<{ priority: Priority; targetHours: number }> = [
+    { priority: Priority.CRITIQUE, targetHours: 12 },
+    { priority: Priority.HAUTE, targetHours: 48 },
+    { priority: Priority.MOYENNE, targetHours: 120 },
+    { priority: Priority.BASSE, targetHours: 360 },
+  ];
+  for (const rule of slaRules) {
+    await prisma.slaRule.upsert({
+      where: { priority: rule.priority },
+      update: {},
+      create: rule,
+    });
+  }
+  await prisma.slaSettings.upsert({
+    where: { id: 'default' },
+    update: {},
+    create: { id: 'default' },
+  });
+  console.log(`${slaRules.length} règles SLA créées`);
+
   console.log('Seeding terminé !');
 }
 

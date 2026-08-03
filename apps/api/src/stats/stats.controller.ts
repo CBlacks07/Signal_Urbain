@@ -33,4 +33,10 @@ export class StatsController {
     if (!targetId) throw new ForbiddenException('Aucune commune associée à votre compte');
     return this.stats.getByCommune(targetId);
   }
+
+  @Get('delays')
+  @Roles(Role.AGENT)
+  getDelayStats(@CurrentUser('role') role: Role, @CurrentUser('communeId') communeId: string) {
+    return this.stats.getDelayStats(role === Role.SUPER_ADMIN ? undefined : communeId);
+  }
 }

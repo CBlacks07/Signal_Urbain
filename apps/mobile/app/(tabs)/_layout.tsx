@@ -1,54 +1,8 @@
 import { Tabs } from 'expo-router';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Home, Plus, User } from 'lucide-react-native';
 import { COLORS } from '../../lib/theme';
-
-// Icones SVG-like dessinees avec des View/Text purs (pas d'emoji)
-function HomeIcon({ color, size = 22 }: { color: string; size?: number }) {
-  return (
-    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-      {/* Toit */}
-      <View style={{
-        width: 0, height: 0,
-        borderLeftWidth: size * 0.5, borderRightWidth: size * 0.5,
-        borderBottomWidth: size * 0.38, borderLeftColor: 'transparent',
-        borderRightColor: 'transparent', borderBottomColor: color,
-        marginBottom: -1,
-      }} />
-      {/* Corps */}
-      <View style={{
-        width: size * 0.7, height: size * 0.45,
-        backgroundColor: color, borderBottomLeftRadius: 2, borderBottomRightRadius: 2,
-      }} />
-    </View>
-  );
-}
-
-function AlertIcon({ size = 24 }: { size?: number }) {
-  return (
-    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-      <Text style={{ fontSize: size * 0.7, fontWeight: '900', color: '#fff', lineHeight: size }}>!</Text>
-    </View>
-  );
-}
-
-function ProfileIcon({ color, size = 22 }: { color: string; size?: number }) {
-  return (
-    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-      {/* Tete */}
-      <View style={{
-        width: size * 0.38, height: size * 0.38,
-        borderRadius: size * 0.19, backgroundColor: color, marginBottom: 1,
-      }} />
-      {/* Corps */}
-      <View style={{
-        width: size * 0.65, height: size * 0.28,
-        backgroundColor: color, borderTopLeftRadius: size * 0.3,
-        borderTopRightRadius: size * 0.3,
-      }} />
-    </View>
-  );
-}
 
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
@@ -79,7 +33,7 @@ export default function TabsLayout() {
         name="index"
         options={{
           title: 'Accueil',
-          tabBarIcon: ({ color }) => <HomeIcon color={color} />,
+          tabBarIcon: ({ color }) => <Home size={21} color={color} />,
         }}
       />
       <Tabs.Screen
@@ -88,7 +42,7 @@ export default function TabsLayout() {
           title: '',
           tabBarIcon: () => (
             <View style={styles.fab}>
-              <AlertIcon />
+              <Plus size={24} color="#fff" />
             </View>
           ),
           tabBarLabel: () => null,
@@ -98,7 +52,7 @@ export default function TabsLayout() {
         name="profile"
         options={{
           title: 'Profil',
-          tabBarIcon: ({ color }) => <ProfileIcon color={color} />,
+          tabBarIcon: ({ color }) => <User size={21} color={color} />,
         }}
       />
     </Tabs>

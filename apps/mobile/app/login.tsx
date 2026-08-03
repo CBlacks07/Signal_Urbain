@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Image } from 'react-native';
 import { router } from 'expo-router';
-import { apiClient, saveToken, getToken, API_BASE } from '../lib/api';
+import { apiClient, saveToken, getToken, decodeJwt, API_BASE } from '../lib/api';
 import { COLORS } from '../lib/theme';
 import { KeyboardAwareScrollView } from '../components/KeyboardAwareScrollView';
 
@@ -15,6 +15,13 @@ export default function LoginScreen() {
   const [debugCode, setDebugCode] = useState('');
   const [communes, setCommunes]   = useState<{ id: string; name: string }[]>([]);
   const [communeId, setCommuneId] = useState('');
+
+  // Un agent est redirigé vers son écran terrain, jamais vers le fil citoyen.
+  const goToHome = async () => {
+    const token = await getToken();
+    const decoded = token ? decodeJwt(token) : null;
+    router.replace(decoded?.role === 'AGENT' ? '/(agent)' : '/(tabs)');
+  };
 
   const requestOtp = async () => {
     if (!phone.trim()) { setError('Entrez votre numéro de téléphone'); return; }
@@ -47,7 +54,7 @@ export default function LoginScreen() {
       if (res.data.needsProfile) {
         setStep('name');
       } else {
-        router.replace('/(tabs)');
+        await goToHome();
       }
     } catch (e: any) {
       setError(e?.response?.data?.message ?? 'Code incorrect ou expiré.');
@@ -77,7 +84,7 @@ export default function LoginScreen() {
     try {
       const token = await getToken();
       await apiClient(token).patch('/users/me', { communeId });
-      router.replace('/(tabs)');
+      await goToHome();
     } catch (e: any) {
       setError(e?.response?.data?.message ?? "Impossible d'enregistrer votre commune.");
     } finally {
@@ -90,7 +97,10 @@ export default function LoginScreen() {
       <KeyboardAwareScrollView contentContainerStyle={styles.inner}>
         {/* Logo */}
         <View style={styles.logoWrap}>
-          <Image source={require('../assets/icon.png')} style={styles.logoImage} resizeMode="contain" />
+          <View style={styles.logoBadge}>
+            <Image source={require('../assets/mark.png')} style={styles.logoImage} resizeMode="contain" />
+          </View>
+          <Text style={styles.logoWordmark}>Signal<Text style={{ color: COLORS.orange }}>Togo</Text></Text>
         </View>
 
         {/* Card */}
@@ -190,8 +200,14 @@ const styles = StyleSheet.create({
   // Contenu aligné en haut (pas centré) : les champs restent hauts sur l'écran,
   // le clavier ne peut donc pas les recouvrir.
   inner:      { flexGrow: 1, justifyContent: 'flex-start', padding: 24, paddingTop: 56 },
-  logoWrap:   { alignItems: 'center', marginBottom: 24 },
-  logoImage:  { width: 130, height: 130 },
+  logoWrap:   { alignItems: 'center', marginBottom: 28 },
+  logoBadge:  {
+    width: 92, height: 92, borderRadius: 26, backgroundColor: '#fff',
+    alignItems: 'center', justifyContent: 'center', marginBottom: 12,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.1, shadowRadius: 14, elevation: 4,
+  },
+  logoImage:  { width: 62, height: 62 },
+  logoWordmark: { fontSize: 17, fontWeight: '800', color: '#1A1A1A' },
   card:       { backgroundColor: '#fff', borderRadius: 24, padding: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 16, elevation: 6 },
   cardTitle:  { fontSize: 20, fontWeight: '800', color: '#1A1A1A', marginBottom: 4 },
   cardSub:    { fontSize: 13, color: '#999', marginBottom: 20 },

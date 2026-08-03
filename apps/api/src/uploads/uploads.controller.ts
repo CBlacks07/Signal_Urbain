@@ -21,7 +21,10 @@ export class UploadsController {
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024 } }))
   uploadPhoto(
     @CurrentUser('id') userId: string,
+    @CurrentUser('role') role: Role,
+    @CurrentUser('communeId') communeId: string | null,
     @Body('incidentId') incidentId: string,
+    @Body('kind') kind: 'AVANT' | 'APRES' | undefined,
     @UploadedFile(
       new ParseFilePipeBuilder()
         .addFileTypeValidator({ fileType: /^image\/(jpe?g|png|webp|heic|heif)$/ })
@@ -31,6 +34,6 @@ export class UploadsController {
     file: Express.Multer.File,
   ) {
     if (!incidentId) throw new BadRequestException('incidentId requis');
-    return this.uploads.uploadPhoto(userId, incidentId, file);
+    return this.uploads.uploadPhoto(userId, role, communeId, incidentId, file, kind ?? 'AVANT');
   }
 }

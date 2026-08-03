@@ -54,6 +54,11 @@ enum NotificationType {
   SYSTEM
 }
 
+enum PhotoKind {
+  AVANT
+  APRES
+}
+
 // ─── Models ───────────────────────────────────────────────────────────────────
 
 model User {
@@ -166,6 +171,16 @@ model Incident {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
+  // Blocage sur un tiers externe (ex. attente CEET) : suspend le décompte du délai
+  blockedReason String?
+  blockedSince  DateTime?
+
+  // Fusion de doublons : un incident fusionné pointe vers l'incident "primaire" qui le représente
+  // et disparaît des listes par défaut. Défusionner = remettre mergedIntoId à null.
+  mergedIntoId  String?
+  mergedInto    Incident?        @relation("IncidentMerge", fields: [mergedIntoId], references: [id])
+  duplicates    Incident[]       @relation("IncidentMerge")
+
   // Relations
   commune       Commune        @relation(fields: [communeId], references: [id])
   reporter      User           @relation("Reporter", fields: [reporterId], references: [id])
@@ -178,6 +193,7 @@ model Incident {
   notifications Notification[]
 
   @@index([status])
+  @@index([mergedIntoId])
   @@index([communeId])
   @@index([priority])
   @@index([createdAt(sort: Desc)])
@@ -186,13 +202,14 @@ model Incident {
 }
 
 model IncidentPhoto {
-  id           String   @id @default(uuid())
+  id           String    @id @default(uuid())
   incidentId   String
-  incident     Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  incident     Incident  @relation(fields: [incidentId], references: [id], onDelete: Cascade)
   url          String
   thumbnailUrl String
-  order        Int      @default(0)
-  createdAt    DateTime @default(now())
+  order        Int       @default(0)
+  kind         PhotoKind @default(AVANT)
+  createdAt    DateTime  @default(now())
 
   @@map("incident_photos")
 }
@@ -269,5 +286,26 @@ model AuditLog {
   createdAt DateTime @default(now())
 
   @@index([entity, entityId])
+  @@index([createdAt(sort: Desc)])
   @@map("audit_logs")
+}
+
+// Objectif de délai d'intervention par priorité (SLA). Une ligne par valeur de l'enum Priority.
+model SlaRule {
+  id          String   @id @default(uuid())
+  priority    Priority @unique
+  targetHours Int
+  updatedAt   DateTime @updatedAt
+
+  @@map("sla_rules")
+}
+
+// Paramètres SLA globaux (ligne singleton, id fixe "default")
+model SlaSettings {
+  id                  String   @id @default("default")
+  suspendOnThirdParty Boolean  @default(false)
+  requireAfterPhoto   Boolean  @default(false)
+  updatedAt           DateTime @updatedAt
+
+  @@map("sla_settings")
 }
