@@ -14,7 +14,13 @@ export function DelayBadge({ delay, small }: { delay: DelayStatus | null | undef
     ? { color: COLORS.warning, bg: COLORS.warningBg }
     : { color: COLORS.success, bg: COLORS.greenLight };
 
-  const label = delay.isBlocked ? "Bloqué" : formatDelay(delay.hoursRemaining);
+  // On précise "restant"/"de retard" pour éviter toute ambiguïté avec le temps écoulé
+  // depuis le signalement (cf. retour terrain : "5j" seul se lisait comme "vieux de 5 jours").
+  const label = delay.isBlocked
+    ? "Bloqué"
+    : delay.isOverdue
+    ? `${formatDelay(-delay.hoursRemaining)} de retard`
+    : `${formatDelay(delay.hoursRemaining)} restant`;
 
   return (
     <span style={{
