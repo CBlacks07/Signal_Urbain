@@ -26,6 +26,8 @@ export default function RootLayout() {
         const decoded = decodeJwt(token);
         if (decoded?.role === 'AGENT') {
           router.replace('/(agent)');
+        } else if (decoded?.role === 'ADMIN' || decoded?.role === 'SUPER_ADMIN') {
+          router.replace('/(admin)');
         }
         // Import dynamique : expo-notifications crash dans Expo Go (SDK 53+)
         try {
@@ -50,6 +52,7 @@ export default function RootLayout() {
         <Stack.Screen name="login" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="(agent)" />
+        <Stack.Screen name="(admin)" />
         <Stack.Screen name="incident/[id]" options={{ presentation: 'card' }} />
       </Stack>
     </SafeAreaProvider>

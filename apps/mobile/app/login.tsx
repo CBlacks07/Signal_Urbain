@@ -29,7 +29,9 @@ export default function LoginScreen() {
   const goToHome = async () => {
     const token = await getToken();
     const decoded = token ? decodeJwt(token) : null;
-    router.replace(decoded?.role === 'AGENT' ? '/(agent)' : '/(tabs)');
+    if (decoded?.role === 'AGENT') router.replace('/(agent)');
+    else if (decoded?.role === 'ADMIN' || decoded?.role === 'SUPER_ADMIN') router.replace('/(admin)');
+    else router.replace('/(tabs)');
   };
 
   const requestOtp = async () => {

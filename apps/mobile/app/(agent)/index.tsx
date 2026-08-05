@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, Linking, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, Linking, ActivityIndicator, Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { MapPin, Navigation, Phone, Camera, LogOut } from 'lucide-react-native';
 import { formatDelay } from '@signal/types';
@@ -45,10 +45,15 @@ export default function AgentScreen() {
 
   const arrive = async (incident: any) => {
     setBusyId(incident.id);
-    const { queued } = await queue.runOrQueue({ id: `arrive-${incident.id}-${Date.now()}`, type: 'STATUS_UPDATE', incidentId: incident.id, status: 'EN_COURS', createdAt: Date.now() });
-    if (!queued) await load();
-    else setIncidents((prev) => prev.map((i) => (i.id === incident.id ? { ...i, status: 'en_cours' } : i)));
-    setBusyId(null);
+    try {
+      const { queued } = await queue.runOrQueue({ id: `arrive-${incident.id}-${Date.now()}`, type: 'STATUS_UPDATE', incidentId: incident.id, status: 'EN_COURS', createdAt: Date.now() });
+      if (!queued) await load();
+      else setIncidents((prev) => prev.map((i) => (i.id === incident.id ? { ...i, status: 'en_cours' } : i)));
+    } catch (e: any) {
+      Alert.alert('Action impossible', e?.response?.data?.message ?? 'Veuillez réessayer.');
+    } finally {
+      setBusyId(null);
+    }
   };
 
   const closeWithProof = async (incident: any) => {
@@ -57,12 +62,17 @@ export default function AgentScreen() {
     const result = await ImagePicker.launchCameraAsync({ quality: 0.6 });
     if (result.canceled || !result.assets?.[0]) return;
     setBusyId(incident.id);
-    const { queued } = await queue.runOrQueue({
-      id: `close-${incident.id}-${Date.now()}`, type: 'CLOSE_WITH_PHOTO', incidentId: incident.id, photoUri: result.assets[0].uri, createdAt: Date.now(),
-    });
-    if (!queued) await load();
-    else setIncidents((prev) => prev.map((i) => (i.id === incident.id ? { ...i, status: 'resolu' } : i)));
-    setBusyId(null);
+    try {
+      const { queued } = await queue.runOrQueue({
+        id: `close-${incident.id}-${Date.now()}`, type: 'CLOSE_WITH_PHOTO', incidentId: incident.id, photoUri: result.assets[0].uri, createdAt: Date.now(),
+      });
+      if (!queued) await load();
+      else setIncidents((prev) => prev.map((i) => (i.id === incident.id ? { ...i, status: 'resolu' } : i)));
+    } catch (e: any) {
+      Alert.alert('Action impossible', e?.response?.data?.message ?? 'Veuillez réessayer.');
+    } finally {
+      setBusyId(null);
+    }
   };
 
   const logout = async () => { await clearToken(); router.replace('/login'); };

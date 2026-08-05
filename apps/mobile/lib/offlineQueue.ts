@@ -1,7 +1,8 @@
-// ─── File d'attente hors-ligne pour l'agent terrain ────────────────────────────
-// Les actions (arrivée sur site, clôture avec photo) sont tentées immédiatement ;
-// en cas d'échec réseau, elles sont mises en file (AsyncStorage) et rejouées
-// automatiquement à la reconnexion (NetInfo) ou sur demande.
+// ─── File d'attente hors-ligne pour l'agent terrain et l'admin mobile ─────────
+// Les actions (arrivée sur site, clôture avec photo, assignation, changement de
+// statut) sont tentées immédiatement ; en cas d'échec réseau, elles sont mises
+// en file (AsyncStorage) et rejouées automatiquement à la reconnexion (NetInfo)
+// ou sur demande.
 
 import { useCallback, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -12,7 +13,8 @@ const STORAGE_KEY = 'signal_offline_queue';
 
 export type PendingAction =
   | { id: string; type: 'STATUS_UPDATE'; incidentId: string; status: string; createdAt: number }
-  | { id: string; type: 'CLOSE_WITH_PHOTO'; incidentId: string; photoUri: string; createdAt: number };
+  | { id: string; type: 'CLOSE_WITH_PHOTO'; incidentId: string; photoUri: string; createdAt: number }
+  | { id: string; type: 'ASSIGN'; incidentId: string; agentId: string; alsoSetAssigne: boolean; createdAt: number };
 
 async function readQueue(): Promise<PendingAction[]> {
   try {
@@ -30,6 +32,13 @@ async function writeQueue(queue: PendingAction[]): Promise<void> {
 async function runAction(token: string, action: PendingAction): Promise<void> {
   if (action.type === 'STATUS_UPDATE') {
     await apiClient(token).patch(`/incidents/${action.incidentId}`, { status: action.status });
+    return;
+  }
+  if (action.type === 'ASSIGN') {
+    await apiClient(token).patch(`/incidents/${action.incidentId}`, {
+      assignedTo: action.agentId,
+      ...(action.alsoSetAssigne ? { status: 'ASSIGNE' } : {}),
+    });
     return;
   }
   const form = new FormData();
@@ -84,13 +93,19 @@ export function useOfflineQueue(token: string | null) {
     return () => unsubscribe();
   }, [flush]);
 
-  /** Essaie l'action immédiatement ; si ça échoue (hors-ligne), la met en file pour plus tard. */
+  /**
+   * Essaie l'action immédiatement ; si ça échoue faute de réseau, la met en file pour
+   * plus tard. Une erreur avec réponse HTTP (ex. 400 "photo après manquante") n'est PAS
+   * mise en file — la rejouer sans changement échouerait à l'identique indéfiniment — elle
+   * est relancée pour que l'appelant l'affiche immédiatement à l'utilisateur.
+   */
   const runOrQueue = useCallback(async (action: PendingAction) => {
     if (!token) return { queued: true };
     try {
       await runAction(token, action);
       return { queued: false };
-    } catch {
+    } catch (e: any) {
+      if (e?.response) throw e;
       await enqueueAction(action);
       await refresh();
       return { queued: true };
